@@ -1,9 +1,6 @@
 import ipaddress
-import math
 import os
 import re
-import struct
-import wave
 import socket
 import subprocess
 import tempfile
@@ -44,7 +41,7 @@ h1{font-size:22px;margin:0 0 4px}h2{font-size:17px;margin:0 0 8px}p{line-height:
 label{display:block;margin:7px 0 4px;font-weight:700;font-size:13px}input,select{width:100%;padding:8px;border-radius:7px;border:1px solid var(--field-border);background:var(--field);color:var(--text);font-size:14px}input[type=range]{padding:0;height:18px}.option-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}.edit-tools{border:1px solid var(--border);border-radius:9px;padding:9px;margin-top:8px}.edit-tools summary{cursor:pointer;font-size:15px;font-weight:800;padding:5px 2px;list-style-position:inside}.edit-tools summary::marker{color:var(--button)}.edit-adjustments{padding-top:8px}.edit-tools h3{font-size:15px;margin:2px 0 7px}.edit-tools label{margin:5px 0 3px;font-size:12px}.edit-tools input:not([type=range]),.edit-tools select{padding:7px;font-size:13px}.edit-tools .preview{margin-top:7px}.preview-title{font-size:13px;font-weight:700;margin:4px 0}.preview-hint{font-size:11px;margin:5px 0}.preview{position:relative;overflow:hidden;border-radius:10px;background:#05070d;aspect-ratio:16/9;margin-top:10px;max-height:70vh;width:100%}.preview video{width:100%;height:100%;object-fit:contain;transition:filter .15s,transform .15s}.playback-controls{display:flex;align-items:center;gap:8px;margin-top:6px}.playback-controls button{width:auto;min-width:72px;margin:0;padding:6px 10px;font-size:12px}.playback-controls input{flex:1;min-width:0;padding:0}.playback-time{font-size:11px;color:var(--muted2);white-space:nowrap}.preview-overlay{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;display:block;padding:0;text-align:center;overflow:visible;z-index:4}.preview-subtitle{position:absolute;left:50%;top:88%;transform:translate(-50%,-50%);color:#fff;text-shadow:0 2px 4px #000,1px 1px 2px #000;font-weight:700;white-space:pre-wrap;max-width:94%;width:max-content;pointer-events:auto;touch-action:none;cursor:move;user-select:none;font-size:clamp(14px,3.2cqw,36px);line-height:1.15;overflow:visible}.blur-box{position:absolute;left:50%;top:82%;width:55%;height:12%;transform:translate(-50%,-50%);background:#ffffff35;backdrop-filter:blur(7px);border:2px dashed #7e9bff;touch-action:none;cursor:move;z-index:3}.blur-box .resize-handle{position:absolute;right:-7px;bottom:-7px;width:18px;height:18px;border:2px solid white;border-radius:50%;background:#718cff;touch-action:none;cursor:nwse-resize}.preview-logo{position:absolute;left:90%;top:8%;transform:translate(-50%,-50%);color:#fff;background:#0008;padding:3px 6px;border-radius:4px;font-size:12px;display:flex;align-items:center;justify-content:center;overflow:visible;pointer-events:auto;touch-action:none;cursor:move;user-select:none;min-width:12px;min-height:12px}.preview-logo img{width:100%;height:100%;object-fit:contain;display:none}.preview-logo .resize-handle{position:absolute;right:-7px;bottom:-7px;width:18px;height:18px;border:2px solid white;border-radius:50%;background:#718cff;box-shadow:0 1px 5px #000;touch-action:none;cursor:nwse-resize}.preview-subtitle .resize-handle{position:absolute;right:-10px;bottom:-10px;width:18px;height:18px;border:2px solid white;border-radius:50%;background:#718cff;box-shadow:0 1px 5px #000;touch-action:none;cursor:nwse-resize}.preview-subtitle{overflow:visible}.preview-text{position:absolute;top:8px;left:8px;color:white;text-shadow:1px 1px 3px #000;font-size:12px}
 button,.download{display:inline-block;border:0;border-radius:8px;background:var(--button);color:var(--button-text);font-weight:800;padding:10px 12px;font-size:14px;text-decoration:none;cursor:pointer;width:100%;margin-top:10px}
 button:disabled{opacity:.55;cursor:wait}.key-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}.status{padding:10px;border-radius:8px;background:var(--status);white-space:pre-wrap;overflow-wrap:anywhere}.topbar{display:flex;align-items:center;justify-content:space-between;gap:10px}.topbar h1{font-size:20px}.settings-btn{width:auto;margin:0;padding:8px 10px;white-space:nowrap}.settings-wrap{position:fixed;z-index:20;inset:0;background:#0009;display:flex;justify-content:flex-end;align-items:flex-start;padding:12px}.settings-card{width:min(340px,100%);max-height:90vh;overflow:auto;background:var(--panel);border:1px solid var(--field-border);border-radius:12px;padding:14px;box-shadow:0 12px 40px #0008}.settings-head{display:flex;justify-content:space-between;align-items:center;gap:10px}.settings-head h2{margin:0}.close-btn{width:auto;margin:0;padding:5px 10px;background:#35415a;color:white}.settings-card label{margin-top:12px}.settings-card .muted{margin-top:8px}
-.note{border-left:3px solid #e8b85b;padding-left:12px}.small{font-size:13px}.hidden{display:none}.wizard-step{display:none}.wizard-step.active{display:block}.step-head{display:flex;align-items:center;gap:10px;margin:2px 0 14px}.step-number{display:inline-flex;align-items:center;justify-content:center;min-width:32px;height:32px;border-radius:50%;background:var(--button);color:var(--button-text);font-weight:800}.step-title{font-size:18px;font-weight:800}.step-desc{font-size:12px;color:var(--muted2);margin-top:3px}.wizard-nav{display:flex;gap:8px;margin-top:16px}.wizard-nav button{width:100%;margin-top:0}.wizard-nav .back{background:#35415a;color:#fff}.step-progress{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin:14px 0}.step-progress span{height:5px;border-radius:8px;background:var(--border)}.step-progress span.on{background:var(--button)}.auto-music-note{padding:10px;border:1px solid var(--border);border-radius:8px;margin:8px 0;color:var(--muted)}a{color:#9fb4ff}
+.note{border-left:3px solid #e8b85b;padding-left:12px}.small{font-size:13px}.hidden{display:none}.wizard-step{display:none}.wizard-step.active{display:block}.step-head{display:flex;align-items:center;gap:10px;margin:2px 0 14px}.step-number{display:inline-flex;align-items:center;justify-content:center;min-width:32px;height:32px;border-radius:50%;background:var(--button);color:var(--button-text);font-weight:800}.step-title{font-size:18px;font-weight:800}.step-desc{font-size:12px;color:var(--muted2);margin-top:3px}.wizard-nav{display:flex;gap:8px;margin-top:16px}.wizard-nav button{width:100%;margin-top:0}.wizard-nav .back{background:#35415a;color:#fff}.step-progress{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin:14px 0}.step-progress span{height:5px;border-radius:8px;background:var(--border)}.step-progress span.on{background:var(--button)}a{color:#9fb4ff}
 </style>
 </head>
 <body><main>
@@ -77,7 +74,7 @@ button:disabled{opacity:.55;cursor:wait}.key-actions{display:grid;grid-template-
 <details class="edit-tools"><summary class="edit-summary">🎨 Edit Tools — ချိန်ညှိရန် နှိပ်ပါ</summary><div class="edit-adjustments"><div><label><input id="autoEffect" type="checkbox" checked style="width:auto;margin-right:5px"> ✨ Auto Effect</label></div><div class="option-grid"><div><label for="blur">Blur Box Strength <span id="blurValue">0</span></label><input id="blur" type="range" min="0" max="10" value="0"><input id="blurX" type="hidden" value="50"><input id="blurY" type="hidden" value="82"><input id="blurW" type="hidden" value="55"><input id="blurH" type="hidden" value="12"><p class="muted small">Blur Box ကို video ပေါ်မှာ လက်နဲ့ရွှေ့/အရွယ်ပြောင်းနိုင်သည်။</p></div><div><label for="subSize">Subtitle Size</label><input id="subSize" type="range" min="14" max="36" value="20"></div><div><label for="subColor">Subtitle Color</label><select id="subColor"><option value="&H00FFFFFF">White</option><option value="&H0000FFFF">Yellow</option><option value="&H0000FF00">Green</option><option value="&H00FF8080">Light Blue</option></select></div><div><label for="subPosition">Subtitle Position</label><select id="subPosition"><option value="bottom">အောက်</option><option value="middle">အလယ်</option><option value="top">အပေါ်</option></select></div><div><label for="subX">Subtitle X <span id="subXValue">50%</span></label><input id="subX" type="range" min="5" max="95" value="50"></div><div><label for="subY">Subtitle Y <span id="subYValue">88%</span></label><input id="subY" type="range" min="5" max="95" value="88"></div><div><label for="subWeight">Subtitle Weight</label><select id="subWeight"><option value="bold">Bold</option><option value="normal">Normal</option></select></div><div><label for="subOutline">Subtitle Outline <span id="subOutlineValue">2</span></label><input id="subOutline" type="range" min="0" max="6" value="2"></div></div>
 <div class="option-grid"><div><label><input id="mirror" type="checkbox" style="width:auto;margin-right:5px"> Mirror လှန်</label></div><div><label for="logoText">Logo / Watermark စာသား</label><input id="logoText" maxlength="40" placeholder="My Recap"></div></div><label for="logoImage">🖼️ Logo ပုံ Upload (PNG/JPG/WEBP, 5 MB အထိ)</label><input id="logoImage" type="file" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp"><div class="option-grid"><div><label for="logoX">Logo X <span id="logoXValue">90%</span></label><input id="logoX" type="range" min="0" max="100" value="90"></div><div><label for="logoY">Logo Y <span id="logoYValue">8%</span></label><input id="logoY" type="range" min="0" max="100" value="8"></div><div><label for="logoW">Logo Width <span id="logoWValue">18%</span></label><input id="logoW" type="range" min="5" max="60" value="18"></div><div><label for="logoH">Logo Height <span id="logoHValue">18%</span></label><input id="logoH" type="range" min="5" max="60" value="18"></div><div><label for="logoOpacity">Logo Opacity <span id="logoOpacityValue">100%</span></label><input id="logoOpacity" type="range" min="10" max="100" value="100"></div></div><label for="overlayText">Video ပေါ်တင်မည့်စာသား</label><input id="overlayText" maxlength="100" placeholder="ကိုယ်ထည့်ချင်တဲ့စာသား"></details><p class="muted small">အများဆုံး 80 MB · 10 မိနစ် · Direct video URL</p>
 <div class="wizard-nav"><button type="button" class="back back-step" data-back="1">← Back</button><button type="button" class="next-step" data-next="3">Next → Final Video</button></div></section>
-<section class="wizard-step" data-step="3"><div class="step-head"><span class="step-number">4</span><div><div class="step-title">Final Video</div><div class="step-desc">သတ်မှတ်ချက်များကို စစ်ပြီး Recap MP4 ထုတ်ပါ</div></div></div><div class="auto-music-note">✓ Video / Voice / Edit Tools အားလုံးပြီးပါပြီ။ Recap ထုတ်ရန် အောက်ကခလုတ်ကို နှိပ်ပါ။ Auto Background Music ဖွင့်ထားလျှင် နောက်ခံတေးသံကို အလိုအလျောက်ထည့်မည်။</div>
+<section class="wizard-step" data-step="3"><div class="step-head"><span class="step-number">4</span><div><div class="step-title">Final Video</div><div class="step-desc">သတ်မှတ်ချက်များကို စစ်ပြီး Recap MP4 ထုတ်ပါ</div></div></div><p class="muted small">✓ Video / Voice / Edit Tools အားလုံးပြီးပါပြီ။ Recap ထုတ်ရန် အောက်ကခလုတ်ကို နှိပ်ပါ။</p>
 <button id="submit" type="submit">🎬 Generate Final Video</button><div class="wizard-nav"><button type="button" class="back back-step" data-back="2">← Back to Edit Tools</button></div></section>
 </form></div>
 <div id="result" class="panel hidden"><h2>အခြေအနေ</h2><div id="status" class="status">စောင့်ဆိုင်းနေသည်…</div><div id="links"></div></div>
@@ -371,34 +368,6 @@ def update_job(job_id, **fields):
         if job_id in JOBS:
             JOBS[job_id].update(fields)
 
-def create_auto_music(path, duration=32, sample_rate=22050):
-    """Create a gentle, royalty-free synthesized ambient backing track using only Python stdlib."""
-    chords = [
-        (130.81, 164.81, 196.00, 261.63),
-        (110.00, 130.81, 164.81, 220.00),
-        (87.31, 130.81, 174.61, 220.00),
-        (98.00, 146.83, 196.00, 246.94),
-    ]
-    total = int(duration * sample_rate)
-    with wave.open(str(path), "wb") as wav:
-        wav.setnchannels(2)
-        wav.setsampwidth(2)
-        wav.setframerate(sample_rate)
-        block = bytearray()
-        for i in range(total):
-            t = i / sample_rate
-            chord = chords[int(t // 4) % len(chords)]
-            fade = min(1.0, t / 1.2, max(0.0, (duration - t) / 1.2))
-            swell = 0.72 + 0.28 * math.sin(2 * math.pi * t / 8.0)
-            sample = sum(math.sin(2 * math.pi * hz * t) for hz in chord) / len(chord)
-            value = int(max(-1.0, min(1.0, sample * fade * swell * 0.14)) * 32767)
-            block.extend(struct.pack("<hh", value, value))
-            if len(block) >= 65536:
-                wav.writeframesraw(block)
-                block.clear()
-        if block:
-            wav.writeframesraw(block)
-
 def process_job(job_id, url, language, workdir, gemini_api_key, groq_api_key, options, uploaded=False):
     try:
         video = workdir / "source.mp4"
@@ -433,10 +402,6 @@ def process_job(job_id, url, language, workdir, gemini_api_key, groq_api_key, op
         music_path = workdir / "background_music"
         if not music_path.exists():
             music_path = None
-        if music_path is None and options.get("auto_music", True):
-            music_path = workdir / "auto_background.wav"
-            update_job(job_id, message="Auto Background Music ကို အလိုအလျောက်ဖန်တီးနေသည်…")
-            create_auto_music(music_path)
         logo_path = workdir / "logo_image"
         if not logo_path.exists(): logo_path = None
         render_video(video, voice, subtitles, output, options, music_path, logo_path)
@@ -447,7 +412,7 @@ def process_job(job_id, url, language, workdir, gemini_api_key, groq_api_key, op
     finally:
         # Keep only completed outputs temporarily for download; remove source and intermediates.
         try:
-            for name in ("source.mp4", "source.mp3", "recap_voice.mp3", "recap.ass", "background_music", "auto_background.wav", "logo_image"):
+            for name in ("source.mp4", "source.mp3", "recap_voice.mp3", "recap.ass", "background_music", "logo_image"):
                 path = workdir / name
                 if path.exists():
                     path.unlink()
@@ -479,7 +444,7 @@ def create_job():
         language = request.form.get("language", "my")
         gemini_api_key = (request.form.get("gemini_api_key") or "").strip()
         groq_api_key = (request.form.get("groq_api_key") or "").strip()
-        options = {"voice": request.form.get("voice", ""), "brightness": request.form.get("brightness", "100"), "contrast": request.form.get("contrast", "100"), "saturation": request.form.get("saturation", "100"), "blur": request.form.get("blur", "0"), "mirror": request.form.get("mirror") == "true", "sub_size": request.form.get("sub_size", "20"), "sub_color": request.form.get("sub_color", "&H00FFFFFF"), "sub_position": request.form.get("sub_position", "bottom"), "logo_text": request.form.get("logo_text", "")[:40], "overlay_text": request.form.get("overlay_text", "")[:100], "music_volume": request.form.get("music_volume", "20"), "auto_music": request.form.get("auto_music", "true") == "true", "auto_effect": request.form.get("auto_effect", "true") == "true", "blur_x": request.form.get("blur_x","50"), "blur_y": request.form.get("blur_y","82"), "blur_w": request.form.get("blur_w","55"), "blur_h": request.form.get("blur_h","12"), "sub_x": request.form.get("sub_x","50"), "sub_y": request.form.get("sub_y","88"), "sub_weight": request.form.get("sub_weight","bold"), "sub_outline": request.form.get("sub_outline","2"), "logo_x": request.form.get("logo_x","90"), "logo_y": request.form.get("logo_y","8"), "logo_w": request.form.get("logo_w","18"), "logo_h": request.form.get("logo_h","18"), "logo_opacity": request.form.get("logo_opacity","100")}
+        options = {"voice": request.form.get("voice", ""), "brightness": request.form.get("brightness", "100"), "contrast": request.form.get("contrast", "100"), "saturation": request.form.get("saturation", "100"), "blur": request.form.get("blur", "0"), "mirror": request.form.get("mirror") == "true", "sub_size": request.form.get("sub_size", "20"), "sub_color": request.form.get("sub_color", "&H00FFFFFF"), "sub_position": request.form.get("sub_position", "bottom"), "logo_text": request.form.get("logo_text", "")[:40], "overlay_text": request.form.get("overlay_text", "")[:100], "music_volume": request.form.get("music_volume", "20"), "auto_effect": request.form.get("auto_effect", "true") == "true", "blur_x": request.form.get("blur_x","50"), "blur_y": request.form.get("blur_y","82"), "blur_w": request.form.get("blur_w","55"), "blur_h": request.form.get("blur_h","12"), "sub_x": request.form.get("sub_x","50"), "sub_y": request.form.get("sub_y","88"), "sub_weight": request.form.get("sub_weight","bold"), "sub_outline": request.form.get("sub_outline","2"), "logo_x": request.form.get("logo_x","90"), "logo_y": request.form.get("logo_y","8"), "logo_w": request.form.get("logo_w","18"), "logo_h": request.form.get("logo_h","18"), "logo_opacity": request.form.get("logo_opacity","100")}
         uploaded_file = request.files.get("video")
         if uploaded_file and not uploaded_file.filename:
             uploaded_file = None
