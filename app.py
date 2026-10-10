@@ -376,7 +376,8 @@ def render_video(video_path, voice_path, srt_path, output_path, options, music_p
 
     # Text layers use the uploaded Myanmar font bundled in /app/fonts.
     font_path = "/usr/share/fonts/truetype/padauk/Padauk-Regular.ttf"
-    # Logo text is rendered through libass to shape Myanmar syllables correctly.\n    if overlay:
+    # Overlay text uses Padauk too, so Burmese shaping matches the subtitles.
+    if overlay:
         base_filters.append("drawtext=fontfile='" + font_path + "':text='" + esc_text(overlay) + "':fontcolor=white:fontsize=22:borderw=2:bordercolor=black:x=(w-text_w)/2:y=12")
 
     command = ["ffmpeg", "-y", "-i", str(video_path), "-i", str(voice_path)]
