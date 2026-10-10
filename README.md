@@ -10,6 +10,8 @@ A small Flask web app for creating a recap video from a **direct video-file URL*
 - Burmese or English narration using Microsoft Edge TTS
 - Approximate SRT subtitles burned into an MP4
 - No app login/password and no Streamlit
+- Website API Key Settings with Save/Clear buttons
+- API keys are saved in the current browser's localStorage and sent over HTTPS only when a recap job starts; the server does not write them to repository files or persistent storage
 
 ## Important limits
 
@@ -26,11 +28,8 @@ A small Flask web app for creating a recap video from a **direct video-file URL*
 
 1. Create a Render Web Service from this GitHub repository.
 2. Choose the Docker runtime and Free plan if available for your account.
-3. Add environment variables:
-   - `GEMINI_API_KEY`: your Google AI Studio API key
-   - `GROQ_API_KEY`: your Groq API key
-   - `GEMINI_MODEL` is already set to `gemini-3.8-flash` in `render.yaml`; the app intentionally uses this exact model.
-4. Deploy and open the generated Render URL.
+3. Deploy and open the generated Render URL.
+4. In the website's **API Key Settings**, enter both the Google AI Studio Gemini API key and Groq API key, then tap **Save Keys**.
 5. Start by testing a short, authorized direct MP4 URL.
 
-Do not commit API keys to GitHub. Keep them in Render Environment settings.
+Keys are stored in the current browser on that device, not in Render Environment or GitHub. When a job starts, the browser sends them over HTTPS and the running job uses them in memory. Clearing browser site data or tapping **Saved Keys ဖျက်မယ်** removes the saved browser copies. Only save keys on a private device; browser storage is not a password vault. Never share keys or commit them to GitHub.
