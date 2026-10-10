@@ -40,23 +40,22 @@ main{max-width:600px;margin:0 auto;padding:12px 12px 24px}.panel{background:#151
 h1{font-size:22px;margin:0 0 4px}h2{font-size:17px;margin:0 0 8px}p{line-height:1.4;color:#c7d0e0;margin:7px 0}.muted{font-size:12px;color:#9caac3}
 label{display:block;margin:10px 0 5px;font-weight:700;font-size:14px}input,select{width:100%;padding:10px;border-radius:8px;border:1px solid #455574;background:#0c1428;color:white;font-size:15px}input[type=range]{padding:0}.option-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.preview{position:relative;overflow:hidden;border-radius:10px;background:#05070d;aspect-ratio:16/9;margin-top:10px}.preview video{width:100%;height:100%;object-fit:contain;transition:filter .15s,transform .15s}.preview-overlay{position:absolute;inset:0;pointer-events:none;display:flex;align-items:flex-end;justify-content:center;padding:5%;text-align:center}.preview-subtitle{color:#fff;text-shadow:0 2px 4px #000,1px 1px 2px #000;font-weight:700}.preview-logo{position:absolute;top:8px;right:8px;color:#fff;background:#0008;padding:3px 6px;border-radius:4px;font-size:12px}.preview-text{position:absolute;top:8px;left:8px;color:white;text-shadow:1px 1px 3px #000;font-size:12px}
 button,.download{display:inline-block;border:0;border-radius:8px;background:#6d8cff;color:#071024;font-weight:800;padding:10px 12px;font-size:14px;text-decoration:none;cursor:pointer;width:100%;margin-top:10px}
-button:disabled{opacity:.55;cursor:wait}.key-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}.status{padding:10px;border-radius:8px;background:#0c1428;white-space:pre-wrap;overflow-wrap:anywhere}
+button:disabled{opacity:.55;cursor:wait}.key-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}.status{padding:10px;border-radius:8px;background:#0c1428;white-space:pre-wrap;overflow-wrap:anywhere}.topbar{display:flex;align-items:center;justify-content:space-between;gap:10px}.topbar h1{font-size:20px}.settings-btn{width:auto;margin:0;padding:8px 10px;white-space:nowrap}.settings-wrap{position:fixed;z-index:20;inset:0;background:#0009;display:flex;justify-content:flex-end;align-items:flex-start;padding:12px}.settings-card{width:min(340px,100%);max-height:90vh;overflow:auto;background:#151d32;border:1px solid #455574;border-radius:12px;padding:14px;box-shadow:0 12px 40px #0008}.settings-head{display:flex;justify-content:space-between;align-items:center;gap:10px}.settings-head h2{margin:0}.close-btn{width:auto;margin:0;padding:5px 10px;background:#35415a;color:white}.settings-card label{margin-top:12px}.settings-card .muted{margin-top:8px}
 .note{border-left:3px solid #e8b85b;padding-left:12px}.small{font-size:13px}.hidden{display:none}a{color:#9fb4ff}
 </style>
 </head>
 <body><main>
-<h1>🎬 One Click Movie Recap</h1>
+<div class="topbar"><h1>🎬 One Click Movie Recap</h1><button class="settings-btn" id="openSettings" type="button">⚙️ Settings</button></div>
 <p class="muted">Video ထည့်ပါ → Recap MP4 ထုတ်ပါ</p>
-<div class="panel">
-<h2>⚙️ API Key Settings</h2>
-<p class="muted"><a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Get Gemini Key ↗</a> · <a href="https://console.groq.com/keys" target="_blank" rel="noopener">Get Groq Key ↗</a></p>
+<div class="settings-wrap hidden" id="settingsWrap"><div class="settings-card"><div class="settings-head"><h2>⚙️ API Keys</h2><button class="close-btn" id="closeSettings" type="button">✕</button></div>
 <label for="geminiKey">Gemini API Key</label>
 <input id="geminiKey" type="password" autocomplete="off" placeholder="Gemini API Key ထည့်ပါ">
 <label for="groqKey">Groq API Key</label>
 <input id="groqKey" type="password" autocomplete="off" placeholder="Groq API Key ထည့်ပါ">
 <div class="key-actions"><button id="saveKeys" type="button">Save Keys</button><button id="clearKeys" type="button" style="background:#35415a;color:#fff">Clear</button></div>
 <p id="keyStatus" class="muted small" role="status">Key မသိမ်းရသေးပါ။</p>
-</div>
+<p class="muted small"><a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Gemini Key ↗</a> · <a href="https://console.groq.com/keys" target="_blank" rel="noopener">Groq Key ↗</a></p>
+</div></div>
 <div class="panel">
 <form id="jobform">
 <label for="url">Option 1 — Direct video URL</label>
@@ -75,6 +74,7 @@ button:disabled{opacity:.55;cursor:wait}.key-actions{display:grid;grid-template-
 <script>
 const form=document.getElementById('jobform'),btn=document.getElementById('submit'),result=document.getElementById('result'),statusBox=document.getElementById('status'),links=document.getElementById('links');
 const geminiInput=document.getElementById('geminiKey'),groqInput=document.getElementById('groqKey'),keyStatus=document.getElementById('keyStatus');
+const settingsWrap=document.getElementById('settingsWrap');document.getElementById('openSettings').addEventListener('click',()=>settingsWrap.classList.remove('hidden'));document.getElementById('closeSettings').addEventListener('click',()=>settingsWrap.classList.add('hidden'));settingsWrap.addEventListener('click',e=>{if(e.target===settingsWrap)settingsWrap.classList.add('hidden');});
 const previewVideo=document.getElementById('previewVideo'),previewLogo=document.getElementById('previewLogo'),previewText=document.getElementById('previewText'),previewSubtitle=document.getElementById('previewSubtitle');
 function updatePreview(){const blur=+document.getElementById('blur').value,size=+document.getElementById('subSize').value;document.getElementById('blurValue').textContent=blur;previewVideo.style.filter=blur?'blur('+Math.min(blur,4)+'px)':'';previewVideo.style.transform=document.getElementById('mirror').checked?'scaleX(-1)':'';previewLogo.textContent=document.getElementById('logoText').value;previewLogo.style.display=previewLogo.textContent?'block':'none';previewText.textContent=document.getElementById('overlayText').value;previewSubtitle.style.fontSize=size+'px';previewSubtitle.style.color=({'&H00FFFFFF':'#fff','&H0000FFFF':'#ffff00','&H0000FF00':'#00ff00','&H00FF8080':'#8080ff'})[document.getElementById('subColor').value]||'#fff';const p=document.getElementById('subPosition').value;document.querySelector('.preview-overlay').style.alignItems=p==='top'?'flex-start':p==='middle'?'center':'flex-end';}
 ['blur','subSize','subColor','subPosition','mirror','logoText','overlayText'].forEach(id=>document.getElementById(id).addEventListener('input',updatePreview));
