@@ -201,9 +201,20 @@ def make_recap(transcript, language, api_key):
     # Generate sequential sections instead of asking for the whole transcript in one
     # response. This avoids silently losing the beginning/end when the model hits its
     # output-token limit. Keep sentence boundaries when splitting.
-    sentences = [s.strip() for s in re.split(r"(?<=[.!?။])\s*|\n+", transcript) if s.strip()]
-    chunks, current = [], ""
+    sentences = [s.strip() for s in re.split(r"(?<=[.!?။])\\s*|\\n+", transcript) if s.strip()]
+    # Also split unusually long unpunctuated Whisper output, so no API request is oversized.
+    pieces = []
     for sentence in sentences or [transcript.strip()]:
+        while len(sentence) > 8500:
+            cut = sentence.rfind(" ", 0, 8500)
+            if cut < 1000:
+                cut = 8500
+            pieces.append(sentence[:cut].strip())
+            sentence = sentence[cut:].strip()
+        if sentence:
+            pieces.append(sentence)
+    chunks, current = [], ""
+    for sentence in pieces:
         if current and len(current) + len(sentence) + 1 > 8500:
             chunks.append(current)
             current = ""
