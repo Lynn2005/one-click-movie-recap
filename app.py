@@ -241,33 +241,49 @@ def seconds_to_srt(seconds):
     secs, millis = divmod(rem, 1000)
     return f"{hours:02}:{minutes:02}:{secs:02},{millis:03}"
 
-def make_subtitles(script, voice_path, srt_path):
+def make_subtitles(script, voice_path, srt_path, video_path=None, options=None):
+    options = options or {}
     duration_text = run_command(["ffprobe", "-v", "error", "-show_entries", "format=duration",
                                  "-of", "default=noprint_wrappers=1:nokey=1", str(voice_path)], timeout=30)
     duration = float(duration_text)
-    if duration <= 0:
-        fail("Voice audio duration မမှန်ပါ။")
+    width, height = 1280, 720
+    if video_path:
+        dimensions = run_command(["ffprobe", "-v", "error", "-select_streams", "v:0",
+                                  "-show_entries", "stream=width,height", "-of", "csv=s=x:p=0", str(video_path)], timeout=30)
+        try: width, height = [int(v) for v in dimensions.strip().split("x")[:2]]
+        except Exception: pass
+    if duration <= 0: fail("Voice audio duration မမှန်ပါ။")
     chunks = split_sentences(script)
     weights = [max(1, len(chunk)) for chunk in chunks]
     total_weight = sum(weights)
-    current = 0.0
+    x = round(width * max(5, min(95, int(options.get("sub_x", 50)))) / 100)
+    default_y = {"bottom":88,"middle":50,"top":20}.get(options.get("sub_position"),88)
+    y = round(height * max(5, min(95, int(options.get("sub_y", default_y))) ) / 100)
+    size = max(14, min(36, int(options.get("sub_size",20))))
+    color = options.get("sub_color","&H00FFFFFF")
+    bold = -1 if options.get("sub_weight","bold") == "bold" else 0
+    outline = max(0,min(6,int(options.get("sub_outline",2))))
     with open(srt_path, "w", encoding="utf-8") as f:
-        for i, (chunk, weight) in enumerate(zip(chunks, weights), start=1):
-            start = current
-            current += duration * weight / total_weight
-            end = min(duration, current)
-            f.write(f"{i}\n{seconds_to_srt(start)} --> {seconds_to_srt(end)}\n{chunk}\n\n")
+        f.write("[Script Info]\nScriptType: v4.00+\nWrapStyle: 2\nScaledBorderAndShadow: yes\n")
+        f.write(f"PlayResX: {width}\nPlayResY: {height}\n\n[V4+ Styles]\n")
+        f.write("Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n")
+        f.write(f"Style: Default,Noto Sans Myanmar,{size},{color},&H000000FF,&H00000000,&H80000000,{bold},0,1,{outline},1,5,10,10,10,1\n\n[Events]\n")
+        f.write("Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n")
+        current = 0.0
+        def ass_time(seconds):
+            cs = int(max(0,seconds)*100)
+            hh,rem=divmod(cs,360000); mm,rem=divmod(rem,6000); ss,cc=divmod(rem,100)
+            return f"{hh}:{mm:02}:{ss:02}.{cc:02}"
+        for chunk,weight in zip(chunks,weights):
+            start=current; current += duration*weight/total_weight; end=min(duration,current)
+            safe=chunk.replace("{","(").replace("}",")").replace("\\","\\\\").replace("\n"," ")
+            f.write(f"Dialogue: 0,{ass_time(start)},{ass_time(end)},Default,,0,0,0,,{{\\pos({x},{y})}}{safe}\n")
 
 def render_video(video_path, voice_path, srt_path, output_path, options, music_path=None, logo_path=None):
     srt_name = str(srt_path).replace("\\", "\\\\").replace(":", "\\:").replace("'", "\\'")
     sx = max(5, min(95, int(options.get("sub_x", 50))))
     sy = max(5, min(95, int(options.get("sub_y", {"bottom":88,"middle":50,"top":20}.get(options.get("sub_position"),88))))
-    alignment = 4 if sx < 34 else (6 if sx > 66 else 5)
-    font_size = max(14, min(36, int(options.get("sub_size", 20))))
-    bold = -1 if options.get("sub_weight", "bold") == "bold" else 0
-    outline = max(0, min(6, int(options.get("sub_outline", 2))))
-    primary = options.get("sub_color", "&H00FFFFFF")
-    subtitle_filter = "subtitles=filename='" + srt_name + "':force_style='FontName=Noto Sans Myanmar,FontSize=" + str(font_size) + ",PrimaryColour=" + primary + ",Bold=" + str(bold) + ",Outline=" + str(outline) + ",Shadow=1,Alignment=" + str(alignment) + ",MarginV=" + str(100-sy) + "'"
+    subtitle_filter = "subtitles=filename='" + srt_name + "'"
     filters = []
     if options.get("mirror"): filters.append("hflip")
     if options.get("auto_lighting", True): filters.append("normalize=blackpt=black:whitept=white:smoothing=50")
@@ -305,8 +321,9 @@ def render_video(video_path, voice_path, srt_path, output_path, options, music_p
             lw, lh = int(options.get("logo_w",18)), int(options.get("logo_h",18))
             lx, ly = int(options.get("logo_x",90)), int(options.get("logo_y",8))
             op = max(10,min(100,int(options.get("logo_opacity",100))))/100
-            graph.append(f"[{logo_index}:v:0]scale=w='max(2,trunc(iw*min((W*{lw/100})/iw,(H*{lh/100})/ih)/2)*2)':h=-1,format=rgba,colorchannelmixer=aa={op}[logo]")
-            graph.append("[vbase][logo]overlay=x='W*" + str(lx/100) + "-w/2':y='H*" + str(ly/100) + "-h/2':shortest=1[vout]")
+            graph.append("[\" + str(logo_index) + ":v:0][vbase]scale2ref=w=main_w*" + str(lw/100) + ":h=main_h*" + str(lh/100) + ":force_original_aspect_ratio=decrease[logo][vref]")
+            graph.append("[logo]format=rgba,colorchannelmixer=aa=" + str(op) + "[logoalpha]")
+            graph.append("[vref][logoalpha]overlay=x='W*" + str(lx/100) + "-w/2':y='H*" + str(ly/100) + "-h/2':shortest=1[vout]")
         else: graph.append("[vbase]null[vout]")
         if music_index is not None:
             volume=max(0,min(100,int(options.get("music_volume",20))))/100
@@ -328,7 +345,7 @@ def process_job(job_id, url, language, workdir, gemini_api_key, groq_api_key, op
         video = workdir / "source.mp4"
         original_audio = workdir / "source.mp3"
         voice = workdir / "recap_voice.mp3"
-        subtitles = workdir / "recap.srt"
+        subtitles = workdir / "recap.ass"
         output = workdir / "movie_recap.mp4"
 
         if uploaded:
@@ -351,7 +368,7 @@ def process_job(job_id, url, language, workdir, gemini_api_key, groq_api_key, op
         synthesize_voice(script, language, voice, options.get("voice", "my-MM-NilarNeural" if language == "my" else "en-US-AriaNeural"))
 
         update_job(job_id, message="Subtitle အချိန်ညှိနေသည်…")
-        make_subtitles(script, voice, subtitles)
+        make_subtitles(script, voice, subtitles, video, options)
 
         update_job(job_id, message="နောက်ဆုံး MP4 ကို တည်ဆောက်နေသည်။ ခဏစောင့်ပါ…")
         music_path = workdir / 'background_music'
@@ -366,7 +383,7 @@ def process_job(job_id, url, language, workdir, gemini_api_key, groq_api_key, op
     finally:
         # Keep only completed outputs temporarily for download; remove source and intermediates.
         try:
-            for name in ("source.mp4", "source.mp3", "recap_voice.mp3", "recap.srt", "background_music", "logo_image"):
+            for name in ("source.mp4", "source.mp3", "recap_voice.mp3", "recap.ass", "background_music", "logo_image"):
                 path = workdir / name
                 if path.exists():
                     path.unlink()
