@@ -290,7 +290,7 @@ def make_subtitles(script, voice_path, srt_path, video_path=None, options=None):
         f.write("[Script Info]\nScriptType: v4.00+\nWrapStyle: 2\nScaledBorderAndShadow: yes\n")
         f.write(f"PlayResX: {width}\nPlayResY: {height}\n\n[V4+ Styles]\n")
         f.write("Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n")
-        f.write(f"Style: Default,A ka 08,{render_size},{color},&H000000FF,&H00000000,&H80000000,{bold},0,1,{outline},1,5,10,10,10,1\n\n[Events]\n")
+        f.write(f"Style: Default,Noto Sans Myanmar,{render_size},{color},&H000000FF,&H00000000,&H80000000,{bold},0,1,{outline},1,5,10,10,10,1\n\n[Events]\n")
         f.write("Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n")
         current = 0.0
         def ass_time(seconds):
@@ -322,7 +322,7 @@ def render_video(video_path, voice_path, srt_path, output_path, options, music_p
         base_filters.append("eq=contrast=1.04:saturation=1.06")
 
     # Text layers use the uploaded Myanmar font bundled in /app/fonts.
-    font_path = "/app/fonts/ဧက ၀၈ - Regular.ttf"
+    font_path = "/usr/share/fonts/truetype/noto/NotoSansMyanmar-Regular.ttf"
     if logo:
         lx, ly = int(options.get("logo_x",90)), int(options.get("logo_y",8))
         logo_width = max(5, min(60, int(options.get("logo_w",18))))
