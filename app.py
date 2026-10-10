@@ -199,9 +199,9 @@ def make_recap(transcript, language, api_key):
     language_name = "natural Burmese (Myanmar)" if language == "my" else "natural English"
     prompt = (
         "Create an original, concise movie recap narration based only on this transcript. "
-        "Write in " + language_name + ". Use clear spoken language, no headings, no timestamps, "
+        "Write in " + language_name + ". If the target is Burmese, write only natural Myanmar script, not romanized Burmese. Use clear spoken language, no headings, no timestamps, "
         "no invented facts, no copied dialogue, and no claims that are unsupported by the transcript. "
-        "Aim for 2 to 3 minutes of narration at most. Output only the narration text.\n\n"
+        "Write a complete narration that can be spoken clearly from the very beginning of the recap video. For a 5–10 minute source, aim for roughly 4–7 minutes of narration when transcript content supports it. In Burmese, use natural sentence-ending punctuation (။) and commas (၊), and separate sentences clearly. Do not compress the whole plot into a few paragraphs. Output only the narration text.\n\n"
         "TRANSCRIPT:\n" + transcript
     )
     endpoint = "https://generativelanguage.googleapis.com/v1beta/models/" + GEMINI_MODEL + ":generateContent"
@@ -240,15 +240,15 @@ def synthesize_voice(script, language, audio_path, voice):
     fail("AI Voice ဖန်တီးမရပါ။ Microsoft Edge TTS connection ကို ၃ ကြိမ် စမ်းပြီး မအောင်မြင်ပါ။ ခဏနောက်ပြန်စမ်းပါ။ Error: " + str(last_error)[:250])
 
 def split_sentences(text):
-    pieces = re.split(r"(?<=[.!?။])\s+|\n+", text.strip())
+    # Burmese sentences often have no whitespace after ။ or ၊.
+    pieces = re.split(r"(?<=[.!?။])\s*|\n+", text.strip())
     pieces = [p.strip() for p in pieces if p.strip()]
-    # Avoid subtitles that are too long on a mobile screen.
     lines = []
     for piece in pieces:
-        while len(piece) > 90:
-            cut = piece.rfind(" ", 0, 85)
-            if cut < 25:
-                cut = 85
+        while len(piece) > 54:
+            cut = piece.rfind(" ", 0, 48)
+            if cut < 15:
+                cut = min(len(piece), 48)
             lines.append(piece[:cut].strip())
             piece = piece[cut:].strip()
         if piece:
@@ -290,7 +290,7 @@ def make_subtitles(script, voice_path, srt_path, video_path=None, options=None):
         f.write("[Script Info]\nScriptType: v4.00+\nWrapStyle: 2\nScaledBorderAndShadow: yes\n")
         f.write(f"PlayResX: {width}\nPlayResY: {height}\n\n[V4+ Styles]\n")
         f.write("Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n")
-        f.write(f"Style: Default,Noto Sans Myanmar,{render_size},{color},&H000000FF,&H00000000,&H80000000,{bold},0,1,{outline},1,5,10,10,10,1\n\n[Events]\n")
+        f.write(f"Style: Default,A ka 08,{render_size},{color},&H000000FF,&H00000000,&H80000000,{bold},0,1,{outline},1,5,10,10,10,1\n\n[Events]\n")
         f.write("Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n")
         current = 0.0
         def ass_time(seconds):
@@ -304,30 +304,34 @@ def make_subtitles(script, voice_path, srt_path, video_path=None, options=None):
 
 def render_video(video_path, voice_path, srt_path, output_path, options, music_path=None, logo_path=None):
     srt_name = str(srt_path).replace("\\", "\\\\").replace(":", "\\:").replace("'", "\\'")
-    sx = max(5, min(95, int(options.get("sub_x", 50))))
-    default_sub_y = {"bottom": 88, "middle": 50, "top": 20}.get(options.get("sub_position"), 88)
-    sy = max(5, min(95, int(options.get("sub_y", default_sub_y))))
-    subtitle_filter = "subtitles=filename='" + srt_name + "'"
-    filters = []
-    if options.get("mirror"): filters.append("hflip")
-    if options.get("auto_effect", True): filters.append("eq=contrast=1.04:saturation=1.06")
     blur = max(0, min(10, int(options.get("blur", 0))))
-    # Blur is applied only to the selected rectangle below.
+    bx = max(0, min(100, int(options.get("blur_x", 50))))
+    by = max(0, min(100, int(options.get("blur_y", 82))))
+    bw = max(10, min(100, int(options.get("blur_w", 55))))
+    bh = max(5, min(50, int(options.get("blur_h", 12))))
 
-    filters.append(subtitle_filter)
     def esc_text(value):
         return value.replace("\\", "\\\\").replace(":", "\\:").replace("'", "\\'").replace("%", "\\%").replace(",", "\\,")
+
     logo = (options.get("logo_text") or "").strip()
     overlay = (options.get("overlay_text") or "").strip()
+    base_filters = []
+    if options.get("mirror"):
+        base_filters.append("hflip")
+    if options.get("auto_effect", True):
+        base_filters.append("eq=contrast=1.04:saturation=1.06")
+
+    # Text layers use the uploaded Myanmar font bundled in /app/fonts.
+    font_path = "/app/fonts/ဧက ၀၈ - Regular.ttf"
     if logo:
         lx, ly = int(options.get("logo_x",90)), int(options.get("logo_y",8))
         logo_width = max(5, min(60, int(options.get("logo_w",18))))
         logo_opacity = max(10, min(100, int(options.get("logo_opacity",100)))) / 100
-        # Keep text watermark placement, scale and transparency consistent with the controls.
-        logo_font_size = "max(12\,h*" + str(logo_width / 100 * 0.12) + ")"
-        filters.append("drawtext=fontfile='/usr/share/fonts/truetype/noto/NotoSansMyanmar-Regular.ttf':text='" + esc_text(logo) + "':fontcolor=white@"+str(logo_opacity)+":fontsize="+logo_font_size+":box=1:boxcolor=black@"+str(0.45*logo_opacity)+":boxborderw=5:x=w*" + str(lx/100) + "-tw/2:y=h*" + str(ly/100) + "-th/2")
-    if overlay: filters.append("drawtext=fontfile='/usr/share/fonts/truetype/noto/NotoSansMyanmar-Regular.ttf':text='" + esc_text(overlay) + "':fontcolor=white:fontsize=22:borderw=2:bordercolor=black:x=(w-text_w)/2:y=12")
-    vf = ",".join(filters)
+        logo_font_size = "max(12\\,h*" + str(logo_width / 100 * 0.12) + ")"
+        base_filters.append("drawtext=fontfile='" + font_path + "':text='" + esc_text(logo) + "':fontcolor=white@"+str(logo_opacity)+":fontsize="+logo_font_size+":box=1:boxcolor=black@"+str(0.45*logo_opacity)+":boxborderw=5:x=w*" + str(lx/100) + "-tw/2:y=h*" + str(ly/100) + "-th/2")
+    if overlay:
+        base_filters.append("drawtext=fontfile='" + font_path + "':text='" + esc_text(overlay) + "':fontcolor=white:fontsize=22:borderw=2:bordercolor=black:x=(w-text_w)/2:y=12")
+
     command = ["ffmpeg", "-y", "-i", str(video_path), "-i", str(voice_path)]
     music_index = None
     logo_index = None
@@ -337,31 +341,46 @@ def render_video(video_path, voice_path, srt_path, output_path, options, music_p
     if logo_path and logo_path.exists() and logo_path.stat().st_size:
         command += ["-i", str(logo_path)]
         logo_index = 3 if music_index is not None else 2
-    if logo_index is None and music_index is None:
-        command += ["-vf", vf, "-map", "0:v:0", "-map", "1:a:0"]
+
+    # Build one graph so mirror, regional blur, subtitles, and image watermark work together.
+    graph = []
+    pre = ",".join(base_filters) if base_filters else "null"
+    if blur > 0:
+        graph.append("[0:v:0]" + pre + ",split=2[vclean][vblur_src]")
+        crop_x = f"max(0,min(iw-iw*{bw/100},iw*{bx/100}-iw*{bw/100}/2))"
+        crop_y = f"max(0,min(ih-ih*{bh/100},ih*{by/100}-ih*{bh/100}/2))"
+        graph.append(f"[vblur_src]crop=w=iw*{bw/100}:h=ih*{bh/100}:x='{crop_x}':y='{crop_y}',boxblur={max(1,blur*2)}:1[vblur]")
+        graph.append(f"[vclean][vblur]overlay=x='W*{bx/100}-w/2':y='H*{by/100}-h/2':eof_action=repeat[vblurred]")
+        graph.append("[vblurred]subtitles=filename='" + srt_name + "'[vbase]")
     else:
-        graph = ["[0:v:0]" + vf + "[vbase]"]
-        if logo_index is not None:
-            lw, lh = int(options.get("logo_w",18)), int(options.get("logo_h",18))
-            lx, ly = int(options.get("logo_x",90)), int(options.get("logo_y",8))
-            op = max(10,min(100,int(options.get("logo_opacity",100))))/100
-            graph.append(f"[{logo_index}:v:0][vbase]scale2ref=w=main_w*{lw/100}:h=main_h*{lh/100}:force_original_aspect_ratio=decrease[logo][vref]")
-            graph.append("[logo]format=rgba,colorchannelmixer=aa=" + str(op) + "[logoalpha]")
-            graph.append("[vref][logoalpha]overlay=x='W*" + str(lx/100) + "-w/2':y='H*" + str(ly/100) + "-h/2':eof_action=repeat[vout]")
-        else: graph.append("[vbase]null[vout]")
-        if music_index is not None:
-            volume=max(0,min(100,int(options.get("music_volume",20))))/100
-            graph += ["[1:a:0]loudnorm=I=-16:TP=-1.5:LRA=11,volume=1[voice]",f"[{music_index}:a:0]volume={volume}[music]","[voice][music]amix=inputs=2:duration=first:dropout_transition=2,loudnorm=I=-16:TP=-1.5:LRA=11[aout]"]
-        else: graph.append("[1:a:0]loudnorm=I=-16:TP=-1.5:LRA=11[aout]")
-        command += ["-filter_complex",";".join(graph),"-map","[vout]","-map","[aout]"]
-    command += ["-c:v","libx264","-preset","ultrafast","-crf","28","-c:a","aac","-b:a","192k","-ar","44100","-map_metadata","-1","-movflags","+faststart",str(output_path)]
+        graph.append("[0:v:0]" + pre + ",subtitles=filename='" + srt_name + "'[vbase]")
+
+    if logo_index is not None:
+        lw, lh = int(options.get("logo_w",18)), int(options.get("logo_h",18))
+        lx, ly = int(options.get("logo_x",90)), int(options.get("logo_y",8))
+        op = max(10,min(100,int(options.get("logo_opacity",100))))/100
+        graph.append(f"[{logo_index}:v:0][vbase]scale2ref=w=main_w*{lw/100}:h=main_h*{lh/100}:force_original_aspect_ratio=decrease[logo][vref]")
+        graph.append("[logo]format=rgba,colorchannelmixer=aa=" + str(op) + "[logoalpha]")
+        graph.append("[vref][logoalpha]overlay=x='W*" + str(lx/100) + "-w/2':y='H*" + str(ly/100) + "-h/2':eof_action=repeat[vout]")
+    else:
+        graph.append("[vbase]null[vout]")
+
+    if music_index is not None:
+        volume=max(0,min(100,int(options.get("music_volume",20))))/100
+        graph += ["[1:a:0]loudnorm=I=-16:TP=-1.5:LRA=11,volume=1[voice]",f"[{music_index}:a:0]volume={volume}[music]","[voice][music]amix=inputs=2:duration=first:dropout_transition=2,loudnorm=I=-16:TP=-1.5:LRA=11[aout]"]
+    else:
+        graph.append("[1:a:0]loudnorm=I=-16:TP=-1.5:LRA=11[aout]")
+
+    command += ["-filter_complex",";".join(graph),"-map","[vout]","-map","[aout]",
+                "-shortest","-c:v","libx264","-preset","ultrafast","-crf","28",
+                "-c:a","aac","-b:a","192k","-ar","44100","-map_metadata","-1",
+                "-movflags","+faststart",str(output_path)]
     run_command(command, timeout=420)
     if not output_path.exists() or output_path.stat().st_size == 0:
         fail("MP4 ဖိုင် မထွက်လာပါ။")
-    # Verify that the exported MP4 really contains an audio stream.
     audio_check = run_command(["ffprobe","-v","error","-select_streams","a:0","-show_entries","stream=codec_name","-of","default=noprint_wrappers=1:nokey=1",str(output_path)], timeout=30).strip()
     if not audio_check:
-        fail("Final MP4 ထဲမှာ Audio Stream မပါပါ။ AI Voice/FFmpeg အဆင့်ကို ပြန်စစ်ပါ။")
+        fail("Final MP4 ထဲမှာ Audio Stream မပါပါ။")
 
 def update_job(job_id, **fields):
     with JOBS_LOCK:
