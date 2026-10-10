@@ -201,7 +201,7 @@ def make_recap(transcript, language, api_key):
     # Generate sequential sections instead of asking for the whole transcript in one
     # response. This avoids silently losing the beginning/end when the model hits its
     # output-token limit. Keep sentence boundaries when splitting.
-    sentences = [s.strip() for s in re.split(r"(?<=[.!?။])\\s*|\\n+", transcript) if s.strip()]
+    sentences = [s.strip() for s in re.split(r"(?<=[.!?။])\s*|\n+", transcript) if s.strip()]
     chunks, current = [], ""
     for sentence in sentences or [transcript.strip()]:
         if current and len(current) + len(sentence) + 1 > 8500:
@@ -226,7 +226,7 @@ def make_recap(transcript, language, api_key):
             "Use clear spoken language and natural punctuation (။ and ၊ for Burmese). No headings, labels, timestamps, bullet points, or copied dialogue. "
             "Make this section concise but complete, around 100-180 words when the source segment supports it. "
             "For the first segment, start the story naturally; for the last segment, finish the events shown in this segment without inventing an ending. "
-            "Output only narration text.\\n\\nTRANSCRIPT SEGMENT:\\n" + chunk
+            "Output only narration text.\n\nTRANSCRIPT SEGMENT:\n" + chunk
         )
         response = requests.post(endpoint, params={"key": api_key},
             json={"contents": [{"parts": [{"text": prompt}]}],
@@ -242,7 +242,7 @@ def make_recap(transcript, language, api_key):
         if not section:
             fail("Gemini 3.8 Flash က recap အပိုင်း " + str(index+1) + " ကို အလွတ်ပြန်ပေးထားသည်။")
         sections.append(section)
-    return "\\n\\n".join(sections)
+    return "\n\n".join(sections)
 
 def synthesize_voice(script, language, audio_path, voice):
     # Edge TTS can occasionally reject WebSocket handshakes; retry with a fresh connection.
