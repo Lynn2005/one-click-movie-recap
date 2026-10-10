@@ -224,15 +224,23 @@ def make_recap(transcript, language, api_key):
     return text
 
 def synthesize_voice(script, language, audio_path, voice):
-    # Voice is selected in the edit panel.
-    try:
-        communicate = edge_tts.Communicate(script, voice)
-        import asyncio
-        asyncio.run(communicate.save(str(audio_path)))
-    except Exception as exc:
-        fail("AI Voice ဖန်တီးမရပါ။ Network/voice availability ကို စစ်ပါ။ " + str(exc)[:300])
-    if not audio_path.exists() or audio_path.stat().st_size == 0:
-        fail("AI Voice ဖိုင် မထွက်လာပါ။")
+    # Edge TTS can occasionally reject WebSocket handshakes; retry with a fresh connection.
+    import asyncio
+    last_error = None
+    for attempt in range(3):
+        try:
+            if audio_path.exists():
+                audio_path.unlink()
+            communicate = edge_tts.Communicate(script, voice)
+            asyncio.run(communicate.save(str(audio_path)))
+            if audio_path.exists() and audio_path.stat().st_size > 0:
+                return
+            last_error = RuntimeError("TTS က အသံဖိုင်အလွတ် ပြန်ပေးခဲ့သည်။")
+        except Exception as exc:
+            last_error = exc
+        if attempt < 2:
+            time.sleep(2 * (attempt + 1))
+    fail("AI Voice ဖန်တီးမရပါ။ Microsoft Edge TTS connection ကို ၃ ကြိမ် စမ်းပြီး မအောင်မြင်ပါ။ ခဏနောက်ပြန်စမ်းပါ။ Error: " + str(last_error)[:250])
 
 def split_sentences(text):
     pieces = re.split(r"(?<=[.!?။])\s+|\n+", text.strip())
