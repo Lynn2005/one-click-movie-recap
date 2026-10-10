@@ -36,45 +36,41 @@ HTML = r"""
 <title>One Click Movie Recap</title>
 <style>
 :root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;background:#0b1020;color:#f3f4f6;font-family:Arial,"Noto Sans Myanmar",sans-serif}
-main{max-width:760px;margin:0 auto;padding:24px 16px 48px}.panel{background:#151d32;border:1px solid #293652;border-radius:18px;padding:22px;margin:16px 0}
-h1{font-size:28px;margin:0 0 8px}p{line-height:1.65;color:#c7d0e0}.muted{font-size:14px;color:#9caac3}
-label{display:block;margin:16px 0 8px;font-weight:700}input,select{width:100%;padding:13px;border-radius:10px;border:1px solid #455574;background:#0c1428;color:white;font-size:16px}
-button,.download{display:inline-block;border:0;border-radius:10px;background:#6d8cff;color:#071024;font-weight:800;padding:14px 18px;font-size:16px;text-decoration:none;cursor:pointer;width:100%;margin-top:18px}
-button:disabled{opacity:.55;cursor:wait}.status{padding:12px;border-radius:10px;background:#0c1428;white-space:pre-wrap;overflow-wrap:anywhere}
+main{max-width:600px;margin:0 auto;padding:12px 12px 24px}.panel{background:#151d32;border:1px solid #293652;border-radius:12px;padding:13px;margin:10px 0}
+h1{font-size:22px;margin:0 0 4px}h2{font-size:17px;margin:0 0 8px}p{line-height:1.4;color:#c7d0e0;margin:7px 0}.muted{font-size:12px;color:#9caac3}
+label{display:block;margin:10px 0 5px;font-weight:700;font-size:14px}input,select{width:100%;padding:10px;border-radius:8px;border:1px solid #455574;background:#0c1428;color:white;font-size:15px}
+button,.download{display:inline-block;border:0;border-radius:8px;background:#6d8cff;color:#071024;font-weight:800;padding:10px 12px;font-size:14px;text-decoration:none;cursor:pointer;width:100%;margin-top:10px}
+button:disabled{opacity:.55;cursor:wait}.key-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}.status{padding:10px;border-radius:8px;background:#0c1428;white-space:pre-wrap;overflow-wrap:anywhere}
 .note{border-left:3px solid #e8b85b;padding-left:12px}.small{font-size:13px}.hidden{display:none}a{color:#9fb4ff}
 </style>
 </head>
 <body><main>
 <h1>🎬 One Click Movie Recap</h1>
-<p>Movie video URL ထည့်ပြီး Recap Script၊ AI Voice၊ Subtitle နဲ့ MP4 ထုတ်ပါ။</p>
+<p class="muted">Video ထည့်ပါ → Recap MP4 ထုတ်ပါ</p>
 <div class="panel">
 <h2>⚙️ API Key Settings</h2>
-<p class="muted">API Key များကို ဒီ Browser ထဲမှာ သိမ်းထားမည်။ Recap စတင်ချိန်တွင် HTTPS ဖြင့် Server သို့ ပို့ပြီး အလုပ်လုပ်ရန်သာ အသုံးပြုမည်။ GitHub သို့မဟုတ် Server ဖိုင်ထဲတွင် မသိမ်းပါ။ ကိုယ်ပိုင်ဖုန်း/Browser တွင်သာ Save လုပ်ပါ။</p>
+<p class="muted"><a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Get Gemini Key ↗</a> · <a href="https://console.groq.com/keys" target="_blank" rel="noopener">Get Groq Key ↗</a></p>
 <label for="geminiKey">Gemini API Key</label>
 <input id="geminiKey" type="password" autocomplete="off" placeholder="Gemini API Key ထည့်ပါ">
 <label for="groqKey">Groq API Key</label>
 <input id="groqKey" type="password" autocomplete="off" placeholder="Groq API Key ထည့်ပါ">
-<button id="saveKeys" type="button">🔐 Save Keys</button>
-<button id="clearKeys" type="button" style="background:#35415a;color:#fff;margin-top:8px">Saved Keys ဖျက်မယ်</button>
+<div class="key-actions"><button id="saveKeys" type="button">Save Keys</button><button id="clearKeys" type="button" style="background:#35415a;color:#fff">Clear</button></div>
 <p id="keyStatus" class="muted small" role="status">Key မသိမ်းရသေးပါ။</p>
 </div>
 <div class="panel">
 <form id="jobform">
 <label for="url">Option 1 — Direct video URL</label>
 <input id="url" name="url" type="url" placeholder="https://example.com/video.mp4">
-<p class="muted small">သို့မဟုတ် ဖုန်းထဲက ဗီဒီယိုဖိုင်ကို တင်နိုင်ပါတယ်။ URL နဲ့ Upload နှစ်ခုလုံး မလိုပါ—တစ်ခုကိုပဲ ရွေးပါ။</p>
+<p class="muted small">URL သို့မဟုတ် ဖုန်းထဲက Video တစ်ခုကို ရွေးပါ။</p>
 <label for="videoFile">Option 2 — ဖုန်းထဲက Video Upload (MP4 / MOV / WEBM / M4V)</label>
 <input id="videoFile" name="video" type="file" accept=".mp4,.mov,.webm,.m4v,video/mp4,video/quicktime,video/webm">
 <label for="language">Recap ဘာသာစကား</label>
 <select id="language" name="language"><option value="my">မြန်မာ</option><option value="en">English</option></select>
-<p class="muted">ဗီဒီယို 80 MB အောက်၊ ၁၀ မိနစ်အောက် ဖြစ်ရပါမယ်။ URL နည်းမှာ direct video URL ကိုသာ လက်ခံပါတယ်။</p>
+<p class="muted">အများဆုံး 80 MB · 10 မိနစ် · Direct video URL</p>
 <button id="submit" type="submit">Recap စတင်မယ်</button>
 </form></div>
 <div id="result" class="panel hidden"><h2>အခြေအနေ</h2><div id="status" class="status">စောင့်ဆိုင်းနေသည်…</div><div id="links"></div></div>
-<div class="panel">
-<p class="note small">မှတ်ချက် — သင်အသုံးပြုခွင့်ရှိသော ဗီဒီယိုကိုသာ ထည့်ပါ။ Render Free တွင် storage ယာယီဖြစ်ပြီး service အိပ်ပျော်ခြင်း သို့မဟုတ် restart ဖြစ်ခြင်းကြောင့် အလုပ်ရပ်သွားနိုင်သည်။ AI API များတွင် quota/ကုန်ကျစရိတ် ရှိနိုင်သည်။</p>
-<p class="muted small">Gemini model: gemini-3.8-flash</p>
-</div>
+<p class="muted small">Gemini 3.8 Flash · ကိုယ်အသုံးပြုခွင့်ရှိသော ဗီဒီယိုကိုသာ အသုံးပြုပါ။</p>
 </main>
 <script>
 const form=document.getElementById('jobform'),btn=document.getElementById('submit'),result=document.getElementById('result'),statusBox=document.getElementById('status'),links=document.getElementById('links');
