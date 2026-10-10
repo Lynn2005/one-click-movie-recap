@@ -243,6 +243,12 @@ def make_recap(transcript, language, api_key):
             json={"contents": [{"parts": [{"text": prompt}]}],
                   "generationConfig": {"maxOutputTokens": 3500, "thinkingConfig": {"thinkingLevel": "LOW"}}},
             timeout=120)
+        if response.status_code == 429:
+            # Explain quota exhaustion clearly instead of showing a long raw API response.
+            error_text = response.text[:3000]
+            retry_match = re.search(r"retry in ([0-9hms. ]+)", error_text, re.IGNORECASE)
+            retry_hint = (" Google က " + retry_match.group(1).strip() + " နောက်မှ ပြန်စမ်းရန် ပြထားသည်။") if retry_match else " Google AI Studio မှာ quota ပြန်ရမည့်အချိန်ကို စစ်ပါ။"
+            fail("Gemini Free Tier request quota ပြည့်သွားပါပြီ (429). ဒီအချိန်မှာ app က Gemini ကို ဆက်မခေါ်နိုင်ပါ။" + retry_hint + " ခဏစောင့်ပြီး ပြန်စမ်းပါ၊ သို့မဟုတ် Google AI Studio မှာ usage/billing ကို စစ်ပါ။")
         if response.status_code >= 400:
             fail("Gemini 3.8 Flash API error (" + str(response.status_code) + "): " + response.text[:600])
         data = response.json()
