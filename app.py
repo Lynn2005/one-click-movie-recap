@@ -15,7 +15,7 @@ import requests
 from flask import Flask, jsonify, render_template_string, send_file, abort
 
 app = Flask(__name__)
-app.config["MAX_CONTENT_LENGTH"] = 2 * 1024 * 1024
+app.config["MAX_CONTENT_LENGTH"] = 82 * 1024 * 1024
 
 # Keep the requested Gemini model fixed. No automatic model fallback.
 GEMINI_MODEL = "gemini-3.8-flash"
@@ -60,11 +60,14 @@ button:disabled{opacity:.55;cursor:wait}.status{padding:12px;border-radius:10px;
 </div>
 <div class="panel">
 <form id="jobform">
-<label for="url">Direct video URL (MP4 / MOV / WEBM / M4V)</label>
-<input id="url" name="url" type="url" placeholder="https://example.com/video.mp4" required>
+<label for="url">Option 1 — Direct video URL</label>
+<input id="url" name="url" type="url" placeholder="https://example.com/video.mp4">
+<p class="muted small">သို့မဟုတ် ဖုန်းထဲက ဗီဒီယိုဖိုင်ကို တင်နိုင်ပါတယ်။ URL နဲ့ Upload နှစ်ခုလုံး မလိုပါ—တစ်ခုကိုပဲ ရွေးပါ။</p>
+<label for="videoFile">Option 2 — ဖုန်းထဲက Video Upload (MP4 / MOV / WEBM / M4V)</label>
+<input id="videoFile" name="video" type="file" accept=".mp4,.mov,.webm,.m4v,video/mp4,video/quicktime,video/webm">
 <label for="language">Recap ဘာသာစကား</label>
 <select id="language" name="language"><option value="my">မြန်မာ</option><option value="en">English</option></select>
-<p class="muted">စမ်းသပ်ရန် ၁၀ မိနစ်အောက်၊ 80 MB အောက် ဗီဒီယိုတိုကို အသုံးပြုပါ။ YouTube၊ Netflix၊ login လိုသော streaming page URL များ မရပါ။</p>
+<p class="muted">ဗီဒီယို 80 MB အောက်၊ ၁၀ မိနစ်အောက် ဖြစ်ရပါမယ်။ URL နည်းမှာ direct video URL ကိုသာ လက်ခံပါတယ်။</p>
 <button id="submit" type="submit">Recap စတင်မယ်</button>
 </form></div>
 <div id="result" class="panel hidden"><h2>အခြေအနေ</h2><div id="status" class="status">စောင့်ဆိုင်းနေသည်…</div><div id="links"></div></div>
@@ -80,8 +83,8 @@ function loadSavedKeys(){try{geminiInput.value=localStorage.getItem('oneclick_ge
 document.getElementById('saveKeys').addEventListener('click',()=>{const g=geminiInput.value.trim(),q=groqInput.value.trim();if(!g||!q){keyStatus.textContent='Gemini နဲ့ Groq Key နှစ်ခုလုံး ထည့်ပါ။';return;}try{localStorage.setItem('oneclick_gemini_key',g);localStorage.setItem('oneclick_groq_key',q);keyStatus.textContent='Key နှစ်ခုလုံးကို ဒီ Browser ထဲမှာ Save လုပ်ပြီးပါပြီ။';}catch(e){keyStatus.textContent='Save မလုပ်နိုင်ပါ။ Browser storage setting ကို စစ်ပါ။';}});
 document.getElementById('clearKeys').addEventListener('click',()=>{try{localStorage.removeItem('oneclick_gemini_key');localStorage.removeItem('oneclick_groq_key');}catch(e){}geminiInput.value='';groqInput.value='';keyStatus.textContent='Browser ထဲက Saved Keys ကို ဖျက်ပြီးပါပြီ။';});
 loadSavedKeys();
-form.addEventListener('submit',async(e)=>{e.preventDefault();const geminiKey=geminiInput.value.trim(),groqKey=groqInput.value.trim();if(!geminiKey||!groqKey){result.classList.remove('hidden');statusBox.textContent='အရင်ဆုံး API Key Settings မှာ Gemini နဲ့ Groq Key နှစ်ခုလုံးထည့်ပြီး Save Keys ကိုနှိပ်ပါ။';return;}btn.disabled=true;result.classList.remove('hidden');links.innerHTML='';statusBox.textContent='အလုပ်စတင်နေသည်…';
-try{const res=await fetch('/api/jobs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:document.getElementById('url').value,language:document.getElementById('language').value,gemini_api_key:geminiKey,groq_api_key:groqKey})});const data=await res.json();if(!res.ok)throw new Error(data.error||'စတင်၍မရပါ');poll(data.id);}catch(err){statusBox.textContent='အမှား: '+err.message;btn.disabled=false;}});
+form.addEventListener('submit',async(e)=>{e.preventDefault();const geminiKey=geminiInput.value.trim(),groqKey=groqInput.value.trim(),videoFile=document.getElementById('videoFile').files[0],videoUrl=document.getElementById('url').value.trim();if(!geminiKey||!groqKey){result.classList.remove('hidden');statusBox.textContent='အရင်ဆုံး API Key Settings မှာ Gemini နဲ့ Groq Key နှစ်ခုလုံးထည့်ပြီး Save Keys ကိုနှိပ်ပါ။';return;}if((!videoUrl&&!videoFile)||(videoUrl&&videoFile)){result.classList.remove('hidden');statusBox.textContent='Video URL သို့မဟုတ် Upload Video တစ်ခုကိုပဲ ရွေးပါ။';return;}btn.disabled=true;result.classList.remove('hidden');links.innerHTML='';statusBox.textContent='အလုပ်စတင်နေသည်…';
+try{let body,headers;if(videoFile){body=new FormData();body.append('url','');body.append('language',document.getElementById('language').value);body.append('gemini_api_key',geminiKey);body.append('groq_api_key',groqKey);body.append('video',videoFile);headers={};}else{body=JSON.stringify({url:videoUrl,language:document.getElementById('language').value,gemini_api_key:geminiKey,groq_api_key:groqKey});headers={'Content-Type':'application/json'};}const res=await fetch('/api/jobs',{method:'POST',headers,body});const data=await res.json();if(!res.ok)throw new Error(data.error||'စတင်၍မရပါ');poll(data.id);}catch(err){statusBox.textContent='အမှား: '+err.message;btn.disabled=false;}});
 async function poll(id){try{const res=await fetch('/api/jobs/'+id);const data=await res.json();if(!res.ok)throw new Error(data.error||'အခြေအနေမရပါ');statusBox.textContent=data.message||data.status;
 if(data.status==='done'){links.innerHTML='<a class="download" href="/api/jobs/'+id+'/download">MP4 ဒေါင်းလုဒ်လုပ်ရန်</a><p><a href="/api/jobs/'+id+'/script">Recap Script ကြည့်ရန်</a></p>';btn.disabled=false;return;}
 if(data.status==='error'){statusBox.textContent='မအောင်မြင်ပါ: '+data.message;btn.disabled=false;return;}setTimeout(()=>poll(id),3000);
@@ -268,7 +271,7 @@ def update_job(job_id, **fields):
         if job_id in JOBS:
             JOBS[job_id].update(fields)
 
-def process_job(job_id, url, language, workdir, gemini_api_key, groq_api_key):
+def process_job(job_id, url, language, workdir, gemini_api_key, groq_api_key, uploaded=False):
     try:
         video = workdir / "source.mp4"
         original_audio = workdir / "source.mp3"
@@ -276,9 +279,13 @@ def process_job(job_id, url, language, workdir, gemini_api_key, groq_api_key):
         subtitles = workdir / "recap.srt"
         output = workdir / "movie_recap.mp4"
 
-        update_job(job_id, status="running", message="ဗီဒီယိုကို ဒေါင်းလုဒ်လုပ်နေသည်…")
-        size, _ = download_video(url, video)
-        update_job(job_id, message=f"ဗီဒီယိုရရှိပါပြီ ({size // (1024*1024)} MB)။ အသံထုတ်နေသည်…")
+        if uploaded:
+            size = video.stat().st_size
+            update_job(job_id, status="running", message=f"တင်ထားသော ဗီဒီယိုကို လုပ်ဆောင်နေသည် ({size // (1024*1024)} MB)…")
+        else:
+            update_job(job_id, status="running", message="ဗီဒီယိုကို URL မှ ဒေါင်းလုဒ်လုပ်နေသည်…")
+            size, _ = download_video(url, video)
+            update_job(job_id, message=f"ဗီဒီယိုရရှိပါပြီ ({size // (1024*1024)} MB)။ အသံထုတ်နေသည်…")
         extract_audio(video, original_audio)
 
         update_job(job_id, message="Groq Whisper ဖြင့် အသံကို စာသားပြောင်းနေသည်…")
@@ -321,29 +328,59 @@ def health():
 @app.post("/api/jobs")
 def create_job():
     from flask import request
-    data = request.get_json(silent=True) or {}
-    url = (data.get("url") or "").strip()
-    language = data.get("language", "my")
-    gemini_api_key = (data.get("gemini_api_key") or "").strip()
-    groq_api_key = (data.get("groq_api_key") or "").strip()
+    uploaded_file = None
+    if request.is_json:
+        data = request.get_json(silent=True) or {}
+        url = (data.get("url") or "").strip()
+        language = data.get("language", "my")
+        gemini_api_key = (data.get("gemini_api_key") or "").strip()
+        groq_api_key = (data.get("groq_api_key") or "").strip()
+    else:
+        url = (request.form.get("url") or "").strip()
+        language = request.form.get("language", "my")
+        gemini_api_key = (request.form.get("gemini_api_key") or "").strip()
+        groq_api_key = (request.form.get("groq_api_key") or "").strip()
+        uploaded_file = request.files.get("video")
+        if uploaded_file and not uploaded_file.filename:
+            uploaded_file = None
     if not gemini_api_key or not groq_api_key:
         return jsonify({"error": "Website API Key Settings မှာ Gemini နဲ့ Groq Key နှစ်ခုလုံး ထည့်ပါ။"}), 400
     if len(gemini_api_key) > 512 or len(groq_api_key) > 512:
         return jsonify({"error": "API Key ပုံစံမမှန်ပါ။ Key ကို ပြန်စစ်ပါ။"}), 400
-    if not url:
-        return jsonify({"error": "Movie URL ထည့်ပါ။"}), 400
+    if not url and not uploaded_file:
+        return jsonify({"error": "Video URL ထည့်ပါ သို့မဟုတ် ဖုန်းထဲက Video ကို Upload လုပ်ပါ။"}), 400
+    if url and uploaded_file:
+        return jsonify({"error": "URL နဲ့ Upload ကို တစ်ခုတည်းသာ ရွေးပါ။"}), 400
     if language not in ("my", "en"):
         return jsonify({"error": "ဘာသာစကားရွေးချယ်မှု မမှန်ပါ။"}), 400
-    try:
-        validate_public_http_url(url)
-    except Exception as exc:
-        return jsonify({"error": str(exc)}), 400
+    if uploaded_file:
+        filename = (uploaded_file.filename or "").lower()
+        allowed_extensions = (".mp4", ".mov", ".webm", ".m4v")
+        if not filename.endswith(allowed_extensions):
+            return jsonify({"error": "MP4, MOV, WEBM သို့မဟုတ် M4V ဖိုင်ကိုသာ Upload လုပ်ပါ။"}), 400
+    else:
+        try:
+            validate_public_http_url(url)
+        except Exception as exc:
+            return jsonify({"error": str(exc)}), 400
     job_id = uuid.uuid4().hex
     workdir = OUTPUT_ROOT / job_id
     workdir.mkdir(parents=True, exist_ok=False)
+    uploaded = bool(uploaded_file)
+    if uploaded:
+        source_path = workdir / "source.mp4"
+        uploaded_file.save(source_path)
+        if source_path.stat().st_size == 0:
+            source_path.unlink(missing_ok=True)
+            workdir.rmdir()
+            return jsonify({"error": "Upload ဖိုင် အလွတ်ဖြစ်နေသည်။"}), 400
+        if source_path.stat().st_size > MAX_VIDEO_BYTES:
+            source_path.unlink(missing_ok=True)
+            workdir.rmdir()
+            return jsonify({"error": "ဗီဒီယို 80 MB ထက်ကြီးနေသည်။ ပိုသေးသောဖိုင်ကို သုံးပါ။"}), 413
     with JOBS_LOCK:
         JOBS[job_id] = {"status": "queued", "message": "အလုပ်တန်းစီနေသည်…", "created": time.time()}
-    thread = threading.Thread(target=process_job, args=(job_id, url, language, workdir, gemini_api_key, groq_api_key), daemon=True)
+    thread = threading.Thread(target=process_job, args=(job_id, url, language, workdir, gemini_api_key, groq_api_key, uploaded), daemon=True)
     thread.start()
     return jsonify({"id": job_id, "status": "queued"}), 202
 
