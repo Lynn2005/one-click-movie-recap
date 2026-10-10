@@ -274,6 +274,11 @@ def synthesize_voice(script, language, audio_path, voice):
             time.sleep(2 * (attempt + 1))
     fail("AI Voice ဖန်တီးမရပါ။ Microsoft Edge TTS connection ကို ၃ ကြိမ် စမ်းပြီး မအောင်မြင်ပါ။ ခဏနောက်ပြန်စမ်းပါ။ Error: " + str(last_error)[:250])
 
+def clean_myanmar_text(text):
+    """Remove invisible format characters that can split Burmese syllable shaping."""
+    return str(text or "").replace("\u200c", "").replace("\u200b", "").replace("\ufeff", "")
+
+
 def split_sentences(text):
     # Burmese sentences often have no whitespace after ။ or ၊.
     pieces = re.split(r"(?<=[.!?။])\s*|\n+", text.strip())
@@ -298,6 +303,7 @@ def seconds_to_srt(seconds):
     return f"{hours:02}:{minutes:02}:{secs:02},{millis:03}"
 
 def make_subtitles(script, voice_path, srt_path, video_path=None, options=None):
+    script = clean_myanmar_text(script)
     options = options or {}
     duration_text = run_command(["ffprobe", "-v", "error", "-show_entries", "format=duration",
                                  "-of", "default=noprint_wrappers=1:nokey=1", str(voice_path)], timeout=30)
@@ -454,6 +460,9 @@ def process_job(job_id, url, language, workdir, gemini_api_key, groq_api_key, op
 
         update_job(job_id, message="Gemini 3.8 Flash ဖြင့် recap စာသားရေးနေသည်…")
         script = make_recap(transcript, language, gemini_api_key)
+        # Gemini/transcription may insert invisible ZWNJ/zero-width characters
+        # inside Burmese syllables (e.g. "မ‌ောင်"); remove them before TTS and subtitles.
+        script = clean_myanmar_text(script)
         (workdir / "recap.txt").write_text(script, encoding="utf-8")
 
         update_job(job_id, message="AI Voice ဖန်တီးနေသည်…")
