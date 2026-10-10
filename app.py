@@ -353,6 +353,34 @@ def update_job(job_id, **fields):
         if job_id in JOBS:
             JOBS[job_id].update(fields)
 
+def create_auto_music(path, duration=32, sample_rate=22050):
+    """Create a gentle, royalty-free synthesized ambient backing track using only Python stdlib."""
+    chords = [
+        (130.81, 164.81, 196.00, 261.63),
+        (110.00, 130.81, 164.81, 220.00),
+        (87.31, 130.81, 174.61, 220.00),
+        (98.00, 146.83, 196.00, 246.94),
+    ]
+    total = int(duration * sample_rate)
+    with wave.open(str(path), "wb") as wav:
+        wav.setnchannels(2)
+        wav.setsampwidth(2)
+        wav.setframerate(sample_rate)
+        block = bytearray()
+        for i in range(total):
+            t = i / sample_rate
+            chord = chords[int(t // 4) % len(chords)]
+            fade = min(1.0, t / 1.2, max(0.0, (duration - t) / 1.2))
+            swell = 0.72 + 0.28 * math.sin(2 * math.pi * t / 8.0)
+            sample = sum(math.sin(2 * math.pi * hz * t) for hz in chord) / len(chord)
+            value = int(max(-1.0, min(1.0, sample * fade * swell * 0.14)) * 32767)
+            block.extend(struct.pack("<hh", value, value))
+            if len(block) >= 65536:
+                wav.writeframesraw(block)
+                block.clear()
+        if block:
+            wav.writeframesraw(block)
+
 def process_job(job_id, url, language, workdir, gemini_api_key, groq_api_key, options, uploaded=False):
     try:
         video = workdir / "source.mp4"
@@ -384,8 +412,13 @@ def process_job(job_id, url, language, workdir, gemini_api_key, groq_api_key, op
         make_subtitles(script, voice, subtitles, video, options)
 
         update_job(job_id, message="နောက်ဆုံး MP4 ကို တည်ဆောက်နေသည်။ ခဏစောင့်ပါ…")
-        music_path = workdir / 'background_music'
-        if not music_path.exists(): music_path = None
+        music_path = workdir / "background_music"
+        if not music_path.exists():
+            music_path = None
+        if music_path is None and options.get("auto_music", True):
+            music_path = workdir / "auto_background.wav"
+            update_job(job_id, message="Auto Background Music ကို အလိုအလျောက်ဖန်တီးနေသည်…")
+            create_auto_music(music_path)
         logo_path = workdir / "logo_image"
         if not logo_path.exists(): logo_path = None
         render_video(video, voice, subtitles, output, options, music_path, logo_path)
@@ -396,7 +429,7 @@ def process_job(job_id, url, language, workdir, gemini_api_key, groq_api_key, op
     finally:
         # Keep only completed outputs temporarily for download; remove source and intermediates.
         try:
-            for name in ("source.mp4", "source.mp3", "recap_voice.mp3", "recap.ass", "background_music", "logo_image"):
+            for name in ("source.mp4", "source.mp3", "recap_voice.mp3", "recap.ass", "background_music", "auto_background.wav", "logo_image"):
                 path = workdir / name
                 if path.exists():
                     path.unlink()
@@ -428,7 +461,7 @@ def create_job():
         language = request.form.get("language", "my")
         gemini_api_key = (request.form.get("gemini_api_key") or "").strip()
         groq_api_key = (request.form.get("groq_api_key") or "").strip()
-        options = {"voice": request.form.get("voice", ""), "brightness": request.form.get("brightness", "100"), "contrast": request.form.get("contrast", "100"), "saturation": request.form.get("saturation", "100"), "blur": request.form.get("blur", "0"), "mirror": request.form.get("mirror") == "true", "sub_size": request.form.get("sub_size", "20"), "sub_color": request.form.get("sub_color", "&H00FFFFFF"), "sub_position": request.form.get("sub_position", "bottom"), "logo_text": request.form.get("logo_text", "")[:40], "overlay_text": request.form.get("overlay_text", "")[:100], "music_volume": request.form.get("music_volume", "20"), "auto_lighting": request.form.get("auto_lighting") == "true", "sub_x": request.form.get("sub_x","50"), "sub_y": request.form.get("sub_y","88"), "sub_weight": request.form.get("sub_weight","bold"), "sub_outline": request.form.get("sub_outline","2"), "logo_x": request.form.get("logo_x","90"), "logo_y": request.form.get("logo_y","8"), "logo_w": request.form.get("logo_w","18"), "logo_h": request.form.get("logo_h","18"), "logo_opacity": request.form.get("logo_opacity","100")}
+        options = {"voice": request.form.get("voice", ""), "brightness": request.form.get("brightness", "100"), "contrast": request.form.get("contrast", "100"), "saturation": request.form.get("saturation", "100"), "blur": request.form.get("blur", "0"), "mirror": request.form.get("mirror") == "true", "sub_size": request.form.get("sub_size", "20"), "sub_color": request.form.get("sub_color", "&H00FFFFFF"), "sub_position": request.form.get("sub_position", "bottom"), "logo_text": request.form.get("logo_text", "")[:40], "overlay_text": request.form.get("overlay_text", "")[:100], "music_volume": request.form.get("music_volume", "20"), "auto_music": request.form.get("auto_music", "true") == "true", "auto_lighting": request.form.get("auto_lighting") == "true", "sub_x": request.form.get("sub_x","50"), "sub_y": request.form.get("sub_y","88"), "sub_weight": request.form.get("sub_weight","bold"), "sub_outline": request.form.get("sub_outline","2"), "logo_x": request.form.get("logo_x","90"), "logo_y": request.form.get("logo_y","8"), "logo_w": request.form.get("logo_w","18"), "logo_h": request.form.get("logo_h","18"), "logo_opacity": request.form.get("logo_opacity","100")}
         uploaded_file = request.files.get("video")
         if uploaded_file and not uploaded_file.filename:
             uploaded_file = None
