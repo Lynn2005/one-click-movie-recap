@@ -352,7 +352,7 @@ def render_video(video_path, voice_path, srt_path, output_path, options, music_p
             op = max(10,min(100,int(options.get("logo_opacity",100))))/100
             graph.append(f"[{logo_index}:v:0][vbase]scale2ref=w=main_w*{lw/100}:h=main_h*{lh/100}:force_original_aspect_ratio=decrease[logo][vref]")
             graph.append("[logo]format=rgba,colorchannelmixer=aa=" + str(op) + "[logoalpha]")
-            graph.append("[vref][logoalpha]overlay=x='W*" + str(lx/100) + "-w/2':y='H*" + str(ly/100) + "-h/2':shortest=1[vout]")
+            graph.append("[vref][logoalpha]overlay=x='W*" + str(lx/100) + "-w/2':y='H*" + str(ly/100) + "-h/2':eof_action=repeat[vout]")
         else: graph.append("[vbase]null[vout]")
         if music_index is not None:
             volume=max(0,min(100,int(options.get("music_volume",20))))/100
