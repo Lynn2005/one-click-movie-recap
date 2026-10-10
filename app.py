@@ -295,7 +295,8 @@ def make_subtitles(script, voice_path, srt_path, video_path=None, options=None):
 def render_video(video_path, voice_path, srt_path, output_path, options, music_path=None, logo_path=None):
     srt_name = str(srt_path).replace("\\", "\\\\").replace(":", "\\:").replace("'", "\\'")
     sx = max(5, min(95, int(options.get("sub_x", 50))))
-    sy = max(5, min(95, int(options.get("sub_y", {"bottom":88,"middle":50,"top":20}.get(options.get("sub_position"),88))))
+    default_sub_y = {"bottom": 88, "middle": 50, "top": 20}.get(options.get("sub_position"), 88)
+    sy = max(5, min(95, int(options.get("sub_y", default_sub_y))))
     subtitle_filter = "subtitles=filename='" + srt_name + "'"
     filters = []
     if options.get("mirror"): filters.append("hflip")
