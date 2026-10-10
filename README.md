@@ -4,7 +4,9 @@ A small Flask web app for creating a recap video from a **direct video-file URL*
 
 ## Features
 
+- Four-step mobile wizard: Video Upload → Voice & Language → Edit Tools → Final Video
 - Movie/video URL input or direct upload from the phone in a mobile-friendly web page
+- Automatically synthesized instrumental background music when no custom music is uploaded (can be disabled; volume adjustable)
 - Speech-to-text using Groq Whisper
 - Recap script generation using **Gemini 3.8 Flash only** (`gemini-3.8-flash`)
 - Burmese or English narration using Microsoft Edge TTS
