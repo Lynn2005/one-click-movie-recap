@@ -330,8 +330,8 @@ def render_video(video_path, voice_path, srt_path, output_path, options, music_p
         logo_opacity = max(10, min(100, int(options.get("logo_opacity",100)))) / 100
         # Keep text watermark placement, scale and transparency consistent with the controls.
         logo_font_size = "max(12\,h*" + str(logo_width / 100 * 0.12) + ")"
-        filters.append("drawtext=text='" + esc_text(logo) + "':fontcolor=white@"+str(logo_opacity)+":fontsize="+logo_font_size+":box=1:boxcolor=black@"+str(0.45*logo_opacity)+":boxborderw=5:x=w*" + str(lx/100) + "-tw/2:y=h*" + str(ly/100) + "-th/2")
-    if overlay: filters.append("drawtext=text='" + esc_text(overlay) + "':fontcolor=white:fontsize=22:borderw=2:bordercolor=black:x=(w-text_w)/2:y=12")
+        filters.append("drawtext=fontfile='/usr/share/fonts/truetype/noto/NotoSansMyanmar-Regular.ttf':text='" + esc_text(logo) + "':fontcolor=white@"+str(logo_opacity)+":fontsize="+logo_font_size+":box=1:boxcolor=black@"+str(0.45*logo_opacity)+":boxborderw=5:x=w*" + str(lx/100) + "-tw/2:y=h*" + str(ly/100) + "-th/2")
+    if overlay: filters.append("drawtext=fontfile='/usr/share/fonts/truetype/noto/NotoSansMyanmar-Regular.ttf':text='" + esc_text(overlay) + "':fontcolor=white:fontsize=22:borderw=2:bordercolor=black:x=(w-text_w)/2:y=12")
     vf = ",".join(filters)
     command = ["ffmpeg", "-y", "-i", str(video_path), "-i", str(voice_path)]
     music_index = None
