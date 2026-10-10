@@ -359,6 +359,7 @@ def health():
 def create_job():
     from flask import request
     uploaded_file = None
+    music_file = None
     if request.is_json:
         data = request.get_json(silent=True) or {}
         url = (data.get("url") or "").strip()
@@ -371,7 +372,7 @@ def create_job():
         language = request.form.get("language", "my")
         gemini_api_key = (request.form.get("gemini_api_key") or "").strip()
         groq_api_key = (request.form.get("groq_api_key") or "").strip()
-        options = {"voice": request.form.get("voice", ""), "brightness": request.form.get("brightness", "100"), "contrast": request.form.get("contrast", "100"), "saturation": request.form.get("saturation", "100"), "blur": request.form.get("blur", "0"), "mirror": request.form.get("mirror") == "true", "sub_size": request.form.get("sub_size", "20"), "sub_color": request.form.get("sub_color", "&H00FFFFFF"), "sub_position": request.form.get("sub_position", "bottom"), "logo_text": request.form.get("logo_text", "")[:40], "overlay_text": request.form.get("overlay_text", "")[:100]}
+        options = {"voice": request.form.get("voice", ""), "brightness": request.form.get("brightness", "100"), "contrast": request.form.get("contrast", "100"), "saturation": request.form.get("saturation", "100"), "blur": request.form.get("blur", "0"), "mirror": request.form.get("mirror") == "true", "sub_size": request.form.get("sub_size", "20"), "sub_color": request.form.get("sub_color", "&H00FFFFFF"), "sub_position": request.form.get("sub_position", "bottom"), "logo_text": request.form.get("logo_text", "")[:40], "overlay_text": request.form.get("overlay_text", "")[:100], "music_volume": request.form.get("music_volume", "20")}
         uploaded_file = request.files.get("video")
         if uploaded_file and not uploaded_file.filename:
             uploaded_file = None
