@@ -315,7 +315,11 @@ def render_video(video_path, voice_path, srt_path, output_path, options, music_p
     overlay = (options.get("overlay_text") or "").strip()
     if logo:
         lx, ly = int(options.get("logo_x",90)), int(options.get("logo_y",8))
-        filters.append("drawtext=text='" + esc_text(logo) + "':fontcolor=white:fontsize=20:box=1:boxcolor=black@0.45:boxborderw=5:x=w*" + str(lx/100) + "-tw/2:y=h*" + str(ly/100) + "-th/2")
+        logo_width = max(5, min(60, int(options.get("logo_w",18))))
+        logo_opacity = max(10, min(100, int(options.get("logo_opacity",100)))) / 100
+        # Keep text watermark placement, scale and transparency consistent with the controls.
+        logo_font_size = "max(12\,h*" + str(logo_width / 100 * 0.12) + ")"
+        filters.append("drawtext=text='" + esc_text(logo) + "':fontcolor=white@"+str(logo_opacity)+":fontsize="+logo_font_size+":box=1:boxcolor=black@"+str(0.45*logo_opacity)+":boxborderw=5:x=w*" + str(lx/100) + "-tw/2:y=h*" + str(ly/100) + "-th/2")
     if overlay: filters.append("drawtext=text='" + esc_text(overlay) + "':fontcolor=white:fontsize=22:borderw=2:bordercolor=black:x=(w-text_w)/2:y=12")
     vf = ",".join(filters)
     command = ["ffmpeg", "-y", "-i", str(video_path), "-i", str(voice_path)]
@@ -341,12 +345,9 @@ def render_video(video_path, voice_path, srt_path, output_path, options, music_p
         else: graph.append("[vbase]null[vout]")
         if music_index is not None:
             volume=max(0,min(100,int(options.get("music_volume",20))))/100
-            graph += ["[1:a:0]volume=1[voice]",f"[{music_index}:a:0]volume={volume}[music]","[voice][music]amix=inputs=2:duration=first:dropout_transition=2[aout]"]
-        else: graph.append("[1:a:0]anull[aout]")
+            graph += ["[1:a:0]loudnorm=I=-16:TP=-1.5:LRA=11,volume=1[voice]",f"[{music_index}:a:0]volume={volume}[music]","[voice][music]amix=inputs=2:duration=first:dropout_transition=2,loudnorm=I=-16:TP=-1.5:LRA=11[aout]"]
+        else: graph.append("[1:a:0]loudnorm=I=-16:TP=-1.5:LRA=11[aout]")
         command += ["-filter_complex",";".join(graph),"-map","[vout]","-map","[aout]"]
-    # Make narration clearly audible, including when background music is enabled.
-    if music_index is None:
-        command += ["-af", "loudnorm=I=-16:TP=-1.5:LRA=11"]
     command += ["-c:v","libx264","-preset","ultrafast","-crf","28","-c:a","aac","-b:a","192k","-ar","44100","-map_metadata","-1","-movflags","+faststart",str(output_path)]
     run_command(command, timeout=420)
     if not output_path.exists() or output_path.stat().st_size == 0:
