@@ -331,7 +331,7 @@ def make_subtitles(script, voice_path, srt_path, video_path=None, options=None):
         f.write("[Script Info]\nScriptType: v4.00+\nWrapStyle: 2\nScaledBorderAndShadow: yes\n")
         f.write(f"PlayResX: {width}\nPlayResY: {height}\n\n[V4+ Styles]\n")
         f.write("Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n")
-        f.write(f"Style: Default,Noto Sans Myanmar,{render_size},{color},&H000000FF,&H00000000,&H80000000,{bold},0,1,{outline},1,5,10,10,10,1\n")
+        f.write(f"Style: Default,Padauk,{render_size},{color},&H000000FF,&H00000000,&H80000000,{bold},0,1,{outline},1,5,10,10,10,1\n")
         logo_text = (options.get("logo_text") or "").strip().replace("{","(").replace("}",")").replace("\n"," ")
         if logo_text:
             logo_width = max(5, min(60, int(options.get("logo_w",18))))
@@ -340,7 +340,7 @@ def make_subtitles(script, voice_path, srt_path, video_path=None, options=None):
             logo_y = round(height * max(0, min(100, int(options.get("logo_y",8)))) / 100)
             logo_opacity = max(10, min(100, int(options.get("logo_opacity",100))))
             logo_alpha = round(255 * (100-logo_opacity) / 100)
-            f.write(f"Style: Logo,Noto Sans Myanmar,{logo_size},&H{logo_alpha:02X}FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,1,1,0,5,10,10,10,1\n")
+            f.write(f"Style: Logo,Padauk,{logo_size},&H{logo_alpha:02X}FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,1,1,0,5,10,10,10,1\n")
         f.write("\n[Events]\n")
         f.write("Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n")
         current = 0.0
@@ -375,7 +375,7 @@ def render_video(video_path, voice_path, srt_path, output_path, options, music_p
         base_filters.append("eq=contrast=1.04:saturation=1.06")
 
     # Text layers use the uploaded Myanmar font bundled in /app/fonts.
-    font_path = "/usr/share/fonts/truetype/noto/NotoSansMyanmar-Regular.ttf"
+    font_path = "/usr/share/fonts/truetype/padauk/Padauk-Regular.ttf"
     # Logo text is rendered through libass to shape Myanmar syllables correctly.\n    if overlay:
         base_filters.append("drawtext=fontfile='" + font_path + "':text='" + esc_text(overlay) + "':fontcolor=white:fontsize=22:borderw=2:bordercolor=black:x=(w-text_w)/2:y=12")
 
