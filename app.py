@@ -325,13 +325,25 @@ def make_subtitles(script, voice_path, srt_path, video_path=None, options=None):
         f.write("[Script Info]\nScriptType: v4.00+\nWrapStyle: 2\nScaledBorderAndShadow: yes\n")
         f.write(f"PlayResX: {width}\nPlayResY: {height}\n\n[V4+ Styles]\n")
         f.write("Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n")
-        f.write(f"Style: Default,Noto Sans Myanmar,{render_size},{color},&H000000FF,&H00000000,&H80000000,{bold},0,1,{outline},1,5,10,10,10,1\n\n[Events]\n")
+        f.write(f"Style: Default,Noto Sans Myanmar,{render_size},{color},&H000000FF,&H00000000,&H80000000,{bold},0,1,{outline},1,5,10,10,10,1\n")
+        logo_text = (options.get("logo_text") or "").strip().replace("{","(").replace("}",")").replace("\n"," ")
+        if logo_text:
+            logo_width = max(5, min(60, int(options.get("logo_w",18))))
+            logo_size = max(12, round(height * logo_width / 100 * 0.12))
+            logo_x = round(width * max(0, min(100, int(options.get("logo_x",90)))) / 100)
+            logo_y = round(height * max(0, min(100, int(options.get("logo_y",8)))) / 100)
+            logo_opacity = max(10, min(100, int(options.get("logo_opacity",100))))
+            logo_alpha = round(255 * (100-logo_opacity) / 100)
+            f.write(f"Style: Logo,Noto Sans Myanmar,{logo_size},&H{logo_alpha:02X}FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,1,1,0,5,10,10,10,1\n")
+        f.write("\n[Events]\n")
         f.write("Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n")
         current = 0.0
         def ass_time(seconds):
             cs = int(max(0,seconds)*100)
             hh,rem=divmod(cs,360000); mm,rem=divmod(rem,6000); ss,cc=divmod(rem,100)
             return f"{hh}:{mm:02}:{ss:02}.{cc:02}"
+        if logo_text:
+            f.write(f"Dialogue: 1,0:00:00.00,{ass_time(duration)},Logo,,0,0,0,,{{\\pos({logo_x},{logo_y})}}{logo_text}\n")
         for chunk,weight in zip(chunks,weights):
             start=current; current += duration*weight/total_weight; end=min(duration,current)
             safe=chunk.replace("{","(").replace("}",")").replace("\\","\\\\").replace("\n"," ")
@@ -358,13 +370,7 @@ def render_video(video_path, voice_path, srt_path, output_path, options, music_p
 
     # Text layers use the uploaded Myanmar font bundled in /app/fonts.
     font_path = "/usr/share/fonts/truetype/noto/NotoSansMyanmar-Regular.ttf"
-    if logo:
-        lx, ly = int(options.get("logo_x",90)), int(options.get("logo_y",8))
-        logo_width = max(5, min(60, int(options.get("logo_w",18))))
-        logo_opacity = max(10, min(100, int(options.get("logo_opacity",100)))) / 100
-        logo_font_size = "max(12\\,h*" + str(logo_width / 100 * 0.12) + ")"
-        base_filters.append("drawtext=fontfile='" + font_path + "':text='" + esc_text(logo) + "':fontcolor=white@"+str(logo_opacity)+":fontsize="+logo_font_size+":box=1:boxcolor=black@"+str(0.45*logo_opacity)+":boxborderw=5:x=w*" + str(lx/100) + "-tw/2:y=h*" + str(ly/100) + "-th/2")
-    if overlay:
+    # Logo text is rendered through libass to shape Myanmar syllables correctly.\n    if overlay:
         base_filters.append("drawtext=fontfile='" + font_path + "':text='" + esc_text(overlay) + "':fontcolor=white:fontsize=22:borderw=2:bordercolor=black:x=(w-text_w)/2:y=12")
 
     command = ["ffmpeg", "-y", "-i", str(video_path), "-i", str(voice_path)]
