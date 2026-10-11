@@ -8,6 +8,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     fonts-noto-core \
     fonts-noto-extra \
+    fonts-noto-mono \
     fonts-sil-padauk \
     fontconfig \
     && fc-cache -f \
