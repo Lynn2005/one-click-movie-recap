@@ -88,7 +88,7 @@ HTML = r"""
 :root{color-scheme:dark;--page:#080d18;--page2:#0c1424;--text:#f4f7ff;--panel:#101a2c;--panel2:#142139;--border:#263650;--muted:#b8c5d9;--muted2:#8192ad;--field:#0a1323;--field-border:#344865;--button:#5d8cff;--button-text:#071226;--status:#0a1424;--accent:#70a5ff;--accent2:#83e2d0;--shadow:0 18px 50px #0003}
 *{box-sizing:border-box}
 html{min-height:100%;background:var(--page)}
-body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 50% -20%,#1a3154 0,transparent 48%),var(--page);color:var(--text);font-family:"Zawgyi-One","Padauk","Noto Sans Myanmar",sans-serif;transition:background .2s,color .2s}
+body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 50% -20%,#1a3154 0,transparent 48%),var(--page);color:var(--text);font-family:"Padauk","Noto Sans Myanmar",sans-serif;transition:background .2s,color .2s}
 body.light{color-scheme:light;--page:#f2f5fb;--page2:#eaf0fa;--text:#17233a;--panel:#fff;--panel2:#f7f9fe;--border:#dce4f0;--muted:#465772;--muted2:#70809a;--field:#fbfcff;--field-border:#cbd6e7;--button:#315fe6;--button-text:#fff;--status:#f0f4fb;--accent:#315fe6;--accent2:#168a80;--shadow:0 18px 50px #243c6412;background:radial-gradient(ellipse at 50% -20%,#dbe7ff 0,transparent 48%),var(--page)}
 main{width:min(100% - 36px,1000px);margin:0 auto;padding:24px 0 42px}
 .topbar{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:0 0 20px;border-bottom:1px solid var(--border)}
@@ -169,7 +169,7 @@ a{color:#9fbaff}
 <section class="wizard-step" data-step="2"><div class="step-head"><span class="step-number">3</span><div><div class="step-title">Edit Tools</div><div class="step-desc">မြန်မာစာတန်းထိုး၊ Logo၊ အလင်းနဲ့ Music ချိန်ပါ</div></div></div>
 <div class="preview-title">👁️ Live Edit Preview</div><div class="preview" id="preview"><video id="previewVideo" playsinline class="hidden"></video><div class="preview-logo" id="previewLogo"><img id="previewLogoImage" alt="Logo preview"><span id="previewLogoText">My Recap</span></div><div class="preview-text" id="previewText"></div><div class="blur-box" id="blurBox"><span class="resize-handle" id="blurResize" aria-label="Blur width"></span><span class="resize-handle blur-height-handle" id="blurHeightResize" aria-label="Blur height"></span></div><div class="preview-overlay"><div class="preview-subtitle" id="previewSubtitle">မြန်မာစာတန်းထိုး အစမ်းမြင်ကွင်း<span class="resize-handle" id="subtitleResize" aria-label="Resize subtitle"></span></div></div></div><div class="playback-controls"><button id="previewPlay" type="button">▶ Play</button><input id="previewSeek" type="range" min="0" max="1000" value="0" aria-label="Video seek"><span class="playback-time" id="previewTime">0:00 / 0:00</span></div><p class="muted preview-hint" id="previewHint">Upload Video ရွေးပါ။ အောက်က Edit Tools ပြောင်းတာနဲ့ ဒီမှာပြောင်းလဲမှုကို ကြည့်နိုင်ပါတယ်။</p>
 <details class="edit-tools"><summary class="edit-summary">🎨 Edit Tools — ချိန်ညှိရန် နှိပ်ပါ</summary><div class="edit-adjustments"><div><label><input id="autoEffect" type="checkbox" checked style="width:auto;margin-right:5px"> ✨ Auto Effect</label></div><div class="option-grid"><div><label for="blur">Blur Box Strength (px) <span id="blurValue">0</span></label><input id="blur" type="range" min="0" max="70" value="0"><input id="blurX" type="hidden" value="50"><input id="blurY" type="hidden" value="84"><input id="blurW" type="hidden" value="55"><input id="blurH" type="hidden" value="12"><p class="muted small">Blur Box ကို video ပေါ်မှာ လက်နဲ့ရွှေ့/အရွယ်ပြောင်းနိုင်သည်။</p></div><div><label for="subSize">စာတန်းအရွယ်အစား</label><input id="subSize" type="range" min="20" max="64" value="40"></div><div><label for="subColor">စာတန်းအရောင်</label><select id="subColor"><option value="&H00FFFFFF">White</option><option value="&H0000FFFF">Yellow</option><option value="&H0000FF00">Green</option><option value="&H00FF8080">Light Blue</option></select></div><div><label for="subPosition">စာတန်းနေရာ</label><select id="subPosition"><option value="bottom">အောက်</option><option value="middle">အလယ်</option><option value="top">အပေါ်</option></select></div><div><label for="subX">စာတန်း X <span id="subXValue">50%</span></label><input id="subX" type="range" min="5" max="95" value="50"></div><div><label for="subY">စာတန်း Y <span id="subYValue">88%</span></label><input id="subY" type="range" min="5" max="95" value="88"></div><div><label for="subWeight">စာတန်းအထူ</label><select id="subWeight"><option value="bold">Bold</option><option value="normal">Normal</option></select></div><div><label for="subOutline">စာတန်းအနားသတ် <span id="subOutlineValue">2</span></label><input id="subOutline" type="range" min="0" max="6" value="2"></div></div>
-<div class="option-grid"><div><label><input id="mirror" type="checkbox" style="width:auto;margin-right:5px"> Mirror လှန်</label></div><div><label for="logoText">Logo / Watermark စာသား</label><input id="logoText" maxlength="40" value="My Recap" placeholder="My Recap"></div></div><label for="logoImage">🖼️ Logo ပုံ Upload (PNG/JPG/WEBP, 5 MB အထိ)</label><input id="logoImage" type="file" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp"><div class="option-grid"><div><label for="logoX">Logo X <span id="logoXValue">90%</span></label><input id="logoX" type="range" min="0" max="100" value="90"></div><div><label for="logoY">Logo Y <span id="logoYValue">8%</span></label><input id="logoY" type="range" min="0" max="100" value="8"></div><div><label for="logoW">Logo အရွယ်အစား <span id="logoWValue">8%</span></label><input id="logoW" type="range" min="2" max="20" value="8"></div><div><label for="logoOpacity">Logo Opacity <span id="logoOpacityValue">100%</span></label><input id="logoOpacity" type="range" min="10" max="100" value="100"></div></div><label for="overlayText">Video ပေါ်တင်မည့်စာသား</label><input id="overlayText" maxlength="100" placeholder="ကိုယ်ထည့်ချင်တဲ့စာသား"></details><p class="muted small">အများဆုံး 80 MB · 10 မိနစ် · Direct video URL</p>
+<div class="option-grid"><div><label><input id="mirror" type="checkbox" style="width:auto;margin-right:5px"> Mirror လှန်</label></div><div><label for="logoText">Logo / Watermark စာသား</label><input id="logoText" maxlength="40" value="My Recap" placeholder="My Recap"></div></div><label for="logoImage">🖼️ Logo ပုံ Upload (PNG/JPG/WEBP, 5 MB အထိ)</label><input id="logoImage" type="file" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp"><div class="option-grid"><div><label for="logoX">Logo X <span id="logoXValue">90%</span></label><input id="logoX" type="range" min="0" max="100" value="90"></div><div><label for="logoY">Logo Y <span id="logoYValue">8%</span></label><input id="logoY" type="range" min="0" max="100" value="8"></div><div><label for="logoW">Logo အရွယ်အစား <span id="logoWValue">4%</span></label><input id="logoW" type="range" min="1" max="12" value="4"></div><div><label for="logoOpacity">Logo Opacity <span id="logoOpacityValue">100%</span></label><input id="logoOpacity" type="range" min="10" max="100" value="100"></div></div><label for="overlayText">Video ပေါ်တင်မည့်စာသား</label><input id="overlayText" maxlength="100" placeholder="ကိုယ်ထည့်ချင်တဲ့စာသား"></details><p class="muted small">အများဆုံး 80 MB · 10 မိနစ် · Direct video URL</p>
 <div class="wizard-nav"><button type="button" class="back back-step" data-back="1">← Back</button><button type="button" class="next-step" data-next="3">Next → Final Video</button></div></section>
 <section class="wizard-step" data-step="3"><div class="step-head"><span class="step-number">4</span><div><div class="step-title">Final Video</div><div class="step-desc">သတ်မှတ်ချက်များကို စစ်ပြီး Recap MP4 ထုတ်ပါ</div></div></div><p class="muted small">✓ Video / Voice / Edit Tools အားလုံးပြီးပါပြီ။ Recap ထုတ်ရန် အောက်ကခလုတ်ကို နှိပ်ပါ။</p>
 <button id="submit" type="submit">🎬 Generate Final Video</button><div class="wizard-nav"><button type="button" class="back back-step" data-back="2">← Back to Edit Tools</button></div></section>
@@ -494,12 +494,12 @@ def make_subtitles(script, voice_path, srt_path, video_path=None, options=None):
         f.write("\ufeff[Script Info]\nScriptType: v4.00+\nWrapStyle: 0\nScaledBorderAndShadow: yes\n")
         f.write(f"PlayResX: {width}\nPlayResY: {height}\n\n[V4+ Styles]\n")
         f.write("Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n")
-        # Try Zawgyi-One as requested; Docker installs the font file.
-        font_family = "Zawgyi-One"
+        # Use Unicode Myanmar font (Padauk) for correct Unicode subtitle rendering.
+        font_family = "Padauk"
         f.write(f"Style: Default,{font_family},{render_size},{color},&H000000FF,&H00000000,&H80000000,{bold},0,1,{outline},1,5,{round(width*0.03)},{round(width*0.03)},10,1\n")
         logo_text = (options.get("logo_text") or "").strip().replace("{","(").replace("}",")").replace("\n"," ")
         if logo_text:
-            logo_width = max(2, min(20, int(options.get("logo_w",8))))
+            logo_width = max(1, min(12, int(options.get("logo_w",4))))
             logo_size = max(12, round(height * logo_width / 100 * 0.12))
             logo_x = round(width * max(0, min(100, int(options.get("logo_x",90)))) / 100)
             logo_y = round(height * max(0, min(100, int(options.get("logo_y",8)))) / 100)
@@ -539,10 +539,8 @@ def render_video(video_path, voice_path, srt_path, output_path, options, music_p
     if options.get("auto_effect", True):
         base_filters.append("eq=contrast=1.04:saturation=1.06")
 
-    # Use Zawgyi-One for video overlays/subtitles as requested.
-    font_path = "/usr/share/fonts/truetype/zawgyi/Zawgyi-One.ttf"
-    if not Path(font_path).is_file():
-        font_path = "/usr/share/fonts/truetype/padauk/Padauk-Regular.ttf"
+    # Prefer Padauk, a Unicode Myanmar font, for overlays and subtitles.
+    font_path = "/usr/share/fonts/truetype/padauk/Padauk-Regular.ttf"
     if not Path(font_path).is_file():
         font_path = "/usr/share/fonts/truetype/noto/NotoSansMyanmar-Regular.ttf"
     if overlay:
@@ -580,7 +578,7 @@ def render_video(video_path, voice_path, srt_path, output_path, options, music_p
     if logo_index is not None:
         lx, ly = int(options.get("logo_x",90)), int(options.get("logo_y",8))
         op = max(10,min(100,int(options.get("logo_opacity",100))))/100
-        graph.append(f"[{logo_index}:v:0][vbase]scale2ref=w=oh*mdar:h=ih*{max(2,min(20,int(options.get('logo_w',8))))/100}[logo][vref]")
+        graph.append(f"[{logo_index}:v:0][vbase]scale2ref=w=oh*mdar:h=ih*{max(1,min(12,int(options.get('logo_w',4))))/100}[logo][vref]")
         graph.append("[logo]format=rgba,colorchannelmixer=aa=" + str(op) + "[logoalpha]")
         graph.append("[vref][logoalpha]overlay=x='W*" + str(lx/100) + "-w/2':y='H*" + str(ly/100) + "-h/2':eof_action=repeat[vout]")
     else:
