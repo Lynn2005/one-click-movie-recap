@@ -1,7 +1,9 @@
 import ipaddress
+import json
 import os
 import re
 import socket
+import sqlite3
 import subprocess
 import tempfile
 import threading
@@ -24,8 +26,52 @@ MAX_VIDEO_SECONDS = 600
 MAX_TRANSCRIPT_CHARS = 45000
 JOBS = {}
 JOBS_LOCK = threading.Lock()
-OUTPUT_ROOT = Path(tempfile.gettempdir()) / "movie-recap-jobs"
+# Set MOVIE_RECAP_DATA_DIR to a mounted persistent disk (for example /var/data)
+# on hosts that support it. Without that setting, the default temporary directory
+# is convenient but is not durable across host restarts/redeploys.
+DATA_ROOT = Path(os.getenv("MOVIE_RECAP_DATA_DIR") or (Path(tempfile.gettempdir()) / "movie-recap-data"))
+DATA_ROOT.mkdir(parents=True, exist_ok=True)
+OUTPUT_ROOT = DATA_ROOT / "movie-recap-jobs"
 OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
+JOB_DB = DATA_ROOT / "jobs.sqlite3"
+
+def _db_connect():
+    connection = sqlite3.connect(str(JOB_DB, ), timeout=10)
+    connection.execute("CREATE TABLE IF NOT EXISTS jobs (id TEXT PRIMARY KEY, payload TEXT NOT NULL)")
+    return connection
+
+def _save_job_locked(job_id):
+    job = JOBS.get(job_id)
+    if job is None:
+        return
+    try:
+        with _db_connect() as connection:
+            connection.execute(
+                "INSERT INTO jobs(id, payload) VALUES(?, ?) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload",
+                (job_id, json.dumps(job, ensure_ascii=False)),
+            )
+    except (OSError, sqlite3.Error):
+        # Keep the app usable even if the configured storage is temporarily unavailable.
+        pass
+
+def _load_jobs():
+    try:
+        with _db_connect() as connection:
+            rows = connection.execute("SELECT id, payload FROM jobs").fetchall()
+        for job_id, payload in rows:
+            try:
+                job = json.loads(payload)
+                if job.get("status") in ("queued", "running"):
+                    job.update(status="error", message="Server restart ဖြစ်သွားသောကြောင့် အရင်အလုပ် ဆက်မလုပ်နိုင်ပါ။ Video ကို ပြန်တင်ပြီး Generate Final Video ကို ထပ်နှိပ်ပါ။", finished=time.time())
+                    with _db_connect() as connection:
+                        connection.execute("UPDATE jobs SET payload=? WHERE id=?", (json.dumps(job, ensure_ascii=False), job_id))
+                JOBS[job_id] = job
+            except (TypeError, ValueError):
+                continue
+    except (OSError, sqlite3.Error):
+        pass
+
+_load_jobs()
 
 HTML = r"""
 <!doctype html>
@@ -103,7 +149,7 @@ document.getElementById('clearKeys').addEventListener('click',()=>{try{localStor
 loadSavedKeys();
 form.addEventListener('submit',async(e)=>{e.preventDefault();const geminiKey=geminiInput.value.trim(),groqKey=groqInput.value.trim(),videoFile=document.getElementById('videoFile').files[0],videoUrl=document.getElementById('url').value.trim();if(!geminiKey||!groqKey){result.classList.remove('hidden');statusBox.textContent='အရင်ဆုံး API Key Settings မှာ Gemini နဲ့ Groq Key နှစ်ခုလုံးထည့်ပြီး Save Keys ကိုနှိပ်ပါ။';return;}if((!videoUrl&&!videoFile)||(videoUrl&&videoFile)){result.classList.remove('hidden');statusBox.textContent='Video URL သို့မဟုတ် Upload Video တစ်ခုကိုပဲ ရွေးပါ။';return;}btn.disabled=true;result.classList.remove('hidden');links.innerHTML='';statusBox.textContent='အလုပ်စတင်နေသည်…';
 try{const body=new FormData();const options={voice:document.getElementById('voice').value,auto_effect:document.getElementById('autoEffect').checked,blur:document.getElementById('blur').value,blur_x:document.getElementById('blurX').value,blur_y:document.getElementById('blurY').value,blur_w:document.getElementById('blurW').value,blur_h:document.getElementById('blurH').value,mirror:document.getElementById('mirror').checked,sub_size:document.getElementById('subSize').value,sub_color:document.getElementById('subColor').value,sub_position:document.getElementById('subPosition').value,sub_x:document.getElementById('subX').value,sub_y:document.getElementById('subY').value,sub_weight:document.getElementById('subWeight').value,sub_outline:document.getElementById('subOutline').value,logo_text:document.getElementById('logoText').value,logo_x:document.getElementById('logoX').value,logo_y:document.getElementById('logoY').value,logo_opacity:document.getElementById('logoOpacity').value,overlay_text:document.getElementById('overlayText').value,};body.append('url',videoFile?'':videoUrl);body.append('language',document.getElementById('language').value);body.append('gemini_api_key',geminiKey);body.append('groq_api_key',groqKey);Object.entries(options).forEach(([k,v])=>body.append(k,String(v)));if(videoFile)body.append('video',videoFile);const logoFile=document.getElementById('logoImage').files[0];if(logoFile)body.append('logo_image',logoFile);const res=await fetch('/api/jobs',{method:'POST',body});const data=await res.json();if(!res.ok)throw new Error(data.error||'စတင်၍မရပါ');poll(data.id);}catch(err){statusBox.textContent='အမှား: '+err.message;btn.disabled=false;}});
-async function poll(id){try{const res=await fetch('/api/jobs/'+id);const data=await res.json();if(!res.ok)throw new Error(data.error||'အခြေအနေမရပါ');statusBox.textContent=data.message||data.status;
+async function poll(id){try{const res=await fetch('/api/jobs/'+id);const data=await res.json();if(!res.ok){if(res.status===404){statusBox.textContent='အရင် Job ကို server မှာ မတွေ့တော့ပါ။ Render restart/redeploy ဖြစ်ခဲ့နိုင်ပါတယ်။ Video ရွေးထားဆဲဆိုရင် Generate Final Video ကို ထပ်နှိပ်ပြီး Job အသစ်စတင်ပါ။';links.innerHTML='';btn.disabled=false;showStep(3);return;}throw new Error(data.error||'အခြေအနေမရပါ');}statusBox.textContent=data.message||data.status;
 if(data.status==='done'){links.innerHTML='<a class="download" href="/api/jobs/'+id+'/download">MP4 ဒေါင်းလုဒ်လုပ်ရန်</a><a class="download" style="background:#35415a;color:#fff" href="/api/jobs/'+id+'/script">Recap Script ကိုဖတ်ရန်</a>';btn.disabled=false;showStep(3);statusBox.scrollIntoView({behavior:'smooth',block:'center'});return;}
 if(data.status==='error'){statusBox.textContent='မအောင်မြင်ပါ: '+data.message;btn.disabled=false;return;}setTimeout(()=>poll(id),3000);
 }catch(err){statusBox.textContent='အခြေအနေစစ်ရာတွင် ပြဿနာ: '+err.message;btn.disabled=false;}}
@@ -470,6 +516,7 @@ def update_job(job_id, **fields):
     with JOBS_LOCK:
         if job_id in JOBS:
             JOBS[job_id].update(fields)
+            _save_job_locked(job_id)
 
 def process_job(job_id, url, language, workdir, gemini_api_key, groq_api_key, options, uploaded=False):
     try:
@@ -653,6 +700,7 @@ def create_job():
             return jsonify({"error": "Background Music ဖိုင် အလွတ်ဖြစ်နေသည်။"}), 400
     with JOBS_LOCK:
         JOBS[job_id] = {"status": "queued", "message": "အလုပ်တန်းစီနေသည်…", "created": time.time()}
+        _save_job_locked(job_id)
     thread = threading.Thread(target=process_job, args=(job_id, url, language, workdir, gemini_api_key, groq_api_key, options, uploaded), daemon=True)
     thread.start()
     return jsonify({"id": job_id, "status": "queued"}), 202
@@ -662,7 +710,10 @@ def job_status(job_id):
     with JOBS_LOCK:
         job = JOBS.get(job_id)
         if not job:
-            return jsonify({"error": "Job မတွေ့ပါ။ Render restart ဖြစ်ခဲ့ပါက ပြန်စတင်ပါ။"}), 404
+            return jsonify({
+                "error": "ဒီ Job ID ကို လက်ရှိ server မှာ မတွေ့တော့ပါ။ Render restart/redeploy ဖြစ်ခဲ့နိုင်ပါတယ်။ Video ဖိုင်ရှိနေသေးလျှင် Generate Final Video ကို ပြန်နှိပ်ပါ။",
+                "recovery": "job_not_found"
+            }), 404
         safe = {k: v for k, v in job.items() if k in ("status", "message", "created", "finished")}
         return jsonify(safe)
 
