@@ -444,8 +444,15 @@ def synthesize_voice(script, language, audio_path, voice, voice_speed=100):
     fail("AI Voice ဖန်တီးမရပါ။ Microsoft Edge TTS connection ကို ၃ ကြိမ် စမ်းပြီး မအောင်မြင်ပါ။ ခဏနောက်ပြန်စမ်းပါ။ Error: " + str(last_error)[:250])
 
 def clean_myanmar_text(text):
-    """Remove invisible format characters that can split Burmese syllable shaping."""
-    return str(text or "").replace("\u200c", "").replace("\u200b", "").replace("\ufeff", "")
+    """Normalize Burmese text for Unicode fonts and subtitle rendering."""
+    import unicodedata
+    value = str(text or "")
+    # Remove invisible formatting characters (including ZWNJ) that can split a syllable.
+    value = "".join(ch for ch in value if unicodedata.category(ch) != "Cf")
+    value = value.replace("\ufeff", "")
+    # Repair a common Zawgyi-order medial-ra sequence, e.g. "ြမန်" -> "မြန်".
+    value = re.sub(r"\u103c([\u1000-\u1021])", r"\1\u103c", value)
+    return unicodedata.normalize("NFC", value)
 
 
 def split_sentences(text):
