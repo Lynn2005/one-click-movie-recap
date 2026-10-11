@@ -97,6 +97,7 @@ button:disabled{opacity:.55;cursor:wait}.key-actions{display:grid;grid-template-
 <body><main>
 <div class="topbar"><div style="display:flex;align-items:center;gap:8px;min-width:0"><button class="settings-btn" id="newJobBtn" type="button">＋ New</button><h1>🎬 One Click Movie Recap</h1></div><div style="display:flex;gap:7px;align-items:center"><button class="settings-btn" id="themeToggle" type="button" aria-label="Toggle light and dark theme">☀️ Light</button><button class="settings-btn" id="openSettings" type="button">⚙️ Settings</button></div></div>
 <p class="muted">Video ထည့်ပါ → Recap MP4 ထုတ်ပါ</p>
+<div class="panel"><h2>📁 Saved Outputs</h2><p class="muted">အသစ်အောင်မြင်စွာ ထုတ်ပြီး အစားထိုးမချင်း နောက်ဆုံး Script, SRT နဲ့ AI Voice ကို ဒီမှာ သိမ်းထားပါမယ်။</p><div class="key-actions"><a class="download" style="margin-top:0" href="/api/latest/script">Script TXT</a><a class="download" style="margin-top:0;background:#237a57;color:#fff" href="/api/latest/srt">Subtitle SRT</a></div><a class="download" style="background:#7652b8;color:#fff" href="/api/latest/voice">AI Voice MP3</a></div>
 <div class="settings-wrap hidden" id="settingsWrap"><div class="settings-card"><div class="settings-head"><h2>⚙️ API Keys</h2><button class="close-btn" id="closeSettings" type="button">✕</button></div>
 <label for="geminiKey">Gemini API Key</label>
 <div class="key-input-row"><input id="geminiKey" type="password" autocomplete="off" placeholder="Gemini API Key ထည့်ပါ"><button class="toggle-key" id="toggleGeminiKey" type="button" aria-label="Show Gemini API key">ကြည့်ရန်</button></div>
@@ -534,8 +535,8 @@ def make_srt(script, voice_path, srt_path):
             start = current
             current += duration * weight / total
             end = min(duration, current)
-            safe = chunk.replace("-->", "→").replace("\\n", " ")
-            handle.write(str(index) + "\\n" + seconds_to_srt(start) + " --> " + seconds_to_srt(end) + "\\n" + safe + "\\n\\n")
+            safe = chunk.replace("-->", "→").replace("\n", " ")
+            handle.write(str(index) + "\n" + seconds_to_srt(start) + " --> " + seconds_to_srt(end) + "\n" + safe + "\n\n")
 
 def save_latest_artifacts(workdir):
     """Replace the saved script/SRT/voice only when a new set is ready."""
