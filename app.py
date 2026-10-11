@@ -537,7 +537,7 @@ def make_subtitles(script, voice_path, srt_path, video_path=None, options=None):
         f.write(f"PlayResX: {width}\nPlayResY: {height}\n\n[V4+ Styles]\n")
         f.write("Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n")
         # Use Unicode Myanmar font (Padauk) for correct Unicode subtitle rendering.
-        font_family = "Noto Sans Myanmar"
+        font_family = "Padauk"
         f.write(f"Style: Default,{font_family},{render_size},{color},&H000000FF,&H00000000,&H80000000,{bold},0,1,{outline},1,5,{round(width*0.03)},{round(width*0.03)},10,1\n")
         logo_text = (options.get("logo_text") or "").strip().replace("{","(").replace("}",")").replace("\n"," ")
         if logo_text:
@@ -582,9 +582,9 @@ def render_video(video_path, voice_path, srt_path, output_path, options, music_p
         base_filters.append("eq=contrast=1.04:saturation=1.06")
 
     # Prefer Noto Sans Myanmar, a Unicode Myanmar font, for overlays and subtitles.
-    font_path = "/usr/share/fonts/truetype/noto/NotoSansMyanmar-Regular.ttf"
+    font_path = "/usr/share/fonts/truetype/padauk/Padauk-Regular.ttf"
     if not Path(font_path).is_file():
-        font_path = "/usr/share/fonts/truetype/padauk/Padauk-Regular.ttf"
+        font_path = "/usr/share/fonts/truetype/noto/NotoSansMyanmar-Regular.ttf"
     if overlay:
         base_filters.append("drawtext=fontfile='" + font_path + "':text='" + esc_text(overlay) + "':fontcolor=white:fontsize=22:borderw=2:bordercolor=black:x=(w-text_w)/2:y=12")
 
