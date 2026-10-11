@@ -414,7 +414,10 @@ def make_subtitles(script, voice_path, srt_path, video_path=None, options=None):
         f.write("[Script Info]\nScriptType: v4.00+\nWrapStyle: 2\nScaledBorderAndShadow: yes\n")
         f.write(f"PlayResX: {width}\nPlayResY: {height}\n\n[V4+ Styles]\n")
         f.write("Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n")
-        f.write(f"Style: Default,Noto Sans Myanmar,{render_size},{color},&H000000FF,&H00000000,&H80000000,{bold},0,1,{outline},1,5,10,10,10,1\n")
+        # Use the user's uploaded A ka 08 font when bundled in fonts/; keep a safe fallback.
+        custom_font = Path(__file__).resolve().parent / "fonts" / "eka-08-regular.ttf"
+        font_family = "A ka 08" if custom_font.is_file() else "Noto Sans Myanmar"
+        f.write(f"Style: Default,{font_family},{render_size},{color},&H000000FF,&H00000000,&H80000000,{bold},0,1,{outline},1,5,10,10,10,1\n")
         logo_text = (options.get("logo_text") or "").strip().replace("{","(").replace("}",")").replace("\n"," ")
         if logo_text:
             logo_width = max(5, min(60, int(options.get("logo_w",18))))
@@ -458,7 +461,8 @@ def render_video(video_path, voice_path, srt_path, output_path, options, music_p
         base_filters.append("eq=contrast=1.04:saturation=1.06")
 
     # Text layers use the uploaded Myanmar font bundled in /app/fonts.
-    font_path = "/usr/share/fonts/truetype/noto/NotoSansMyanmar-Regular.ttf"
+    custom_font = Path(__file__).resolve().parent / "fonts" / "eka-08-regular.ttf"
+    font_path = str(custom_font) if custom_font.is_file() else "/usr/share/fonts/truetype/noto/NotoSansMyanmar-Regular.ttf"
     # Overlay text uses Padauk too, so Burmese shaping matches the subtitles.
     if overlay:
         base_filters.append("drawtext=fontfile='" + font_path + "':text='" + esc_text(overlay) + "':fontcolor=white:fontsize=22:borderw=2:bordercolor=black:x=(w-text_w)/2:y=12")
