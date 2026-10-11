@@ -433,8 +433,40 @@ def seconds_to_srt(seconds):
     secs, millis = divmod(rem, 1000)
     return f"{hours:02}:{minutes:02}:{secs:02},{millis:03}"
 
+def fit_voice_to_video(video_path, voice_path):
+    """Match narration length to the uploaded video using pitch-preserving tempo adjustment."""
+    def probe(path):
+        value = run_command(["ffprobe", "-v", "error", "-show_entries", "format=duration",
+                             "-of", "default=noprint_wrappers=1:nokey=1", str(path)], timeout=30)
+        return float(value)
+    try:
+        video_duration = probe(video_path)
+        voice_duration = probe(voice_path)
+    except (TypeError, ValueError):
+        fail("Video/AI Voice အချိန်ကို မဖတ်နိုင်ပါ။")
+    if video_duration <= 0 or voice_duration <= 0:
+        fail("Video သို့မဟုတ် AI Voice duration မမှန်ပါ။")
+    tempo = voice_duration / video_duration
+    factors = []
+    while tempo > 2.0:
+        factors.append(2.0)
+        tempo /= 2.0
+    while tempo < 0.5:
+        factors.append(0.5)
+        tempo /= 0.5
+    factors.append(tempo)
+    atempo = ",".join(f"atempo={factor:.8f}" for factor in factors)
+    fitted = voice_path.with_name("recap_voice_fitted.mp3")
+    run_command(["ffmpeg", "-y", "-i", str(voice_path), "-vn", "-af", atempo,
+                 "-codec:a", "libmp3lame", "-q:a", "3", str(fitted)], timeout=180)
+    if not fitted.exists() or fitted.stat().st_size == 0:
+        fail("AI Voice ကို Video အချိန်နဲ့ ညှိမရပါ။")
+    fitted.replace(voice_path)
+
+
 def make_subtitles(script, voice_path, srt_path, video_path=None, options=None):
-    script = clean_myanmar_text(script)
+    import unicodedata
+    script = unicodedata.normalize("NFC", clean_myanmar_text(script))
     options = options or {}
     duration_text = run_command(["ffprobe", "-v", "error", "-show_entries", "format=duration",
                                  "-of", "default=noprint_wrappers=1:nokey=1", str(voice_path)], timeout=30)
@@ -459,7 +491,7 @@ def make_subtitles(script, voice_path, srt_path, video_path=None, options=None):
     bold = -1 if options.get("sub_weight","bold") == "bold" else 0
     outline = max(0,min(6,int(options.get("sub_outline",2))))
     with open(srt_path, "w", encoding="utf-8") as f:
-        f.write("[Script Info]\nScriptType: v4.00+\nWrapStyle: 0\nScaledBorderAndShadow: yes\n")
+        f.write("\ufeff[Script Info]\nScriptType: v4.00+\nWrapStyle: 0\nScaledBorderAndShadow: yes\n")
         f.write(f"PlayResX: {width}\nPlayResY: {height}\n\n[V4+ Styles]\n")
         f.write("Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n")
         # Padauk is installed in the Docker image and supports Unicode Myanmar shaping.
@@ -656,9 +688,12 @@ def process_job(job_id, url, language, workdir, gemini_api_key, groq_api_key, op
         (workdir / "recap.txt").write_text(script, encoding="utf-8")
 
         update_job(job_id, message="AI Voice ဖန်တီးနေသည်…")
-        synthesize_voice(script, language, voice, options.get("voice", "my-MM-NilarNeural" if language == "my" else "en-US-AriaNeural"), options.get("voice_speed", 100))
+        synthesize_voice(script, language, voice, options.get("voice", "my-MM-NilarNeural" if language == "my" else "en-US-AriaNeural"), 100)
 
-        update_job(job_id, message="Subtitle အချိန်ညှိနေသည်…")
+        update_job(job_id, message="AI Voice ကို Video အရှည်နဲ့ အချိန်ညှိနေသည်…")
+        fit_voice_to_video(video, voice)
+
+        update_job(job_id, message="Unicode မြန်မာစာတန်းထိုး အချိန်ညှိနေသည်…")
         music_path = workdir / "background_music"
         if not music_path.exists():
             music_path = None
