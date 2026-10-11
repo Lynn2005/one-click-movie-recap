@@ -588,9 +588,9 @@ def render_video(video_path, voice_path, srt_path, output_path, options, music_p
 
     if music_index is not None:
         volume=max(0,min(100,int(options.get("music_volume",20))))/100
-        graph += ["[1:a:0]loudnorm=I=-16:TP=-1.5:LRA=11,volume=1[voice]",f"[{music_index}:a:0]volume={volume}[music]","[voice][music]amix=inputs=2:duration=first:dropout_transition=2,loudnorm=I=-16:TP=-1.5:LRA=11[aout]"]
+        graph += ["[1:a:0]volume=1[voice]",f"[{music_index}:a:0]volume={volume}[music]","[voice][music]amix=inputs=2:duration=first:dropout_transition=0,alimiter=limit=0.95[aout]"]
     else:
-        graph.append("[1:a:0]loudnorm=I=-16:TP=-1.5:LRA=11[aout]")
+        graph.append("[1:a:0]volume=1,alimiter=limit=0.95[aout]")
 
     # Use the AI voice duration as the master timeline. The video is trimmed to
     # the same endpoint so the exported MP4, narration, and generated subtitles end together.
@@ -601,10 +601,10 @@ def render_video(video_path, voice_path, srt_path, output_path, options, music_p
     except (TypeError, ValueError):
         fail("AI Voice timeline duration ကို မဖတ်နိုင်ပါ။")
     command += ["-filter_complex",";".join(graph),"-map","[vout]","-map","[aout]",
-                "-t", f"{voice_duration:.3f}", "-shortest","-c:v","libx264","-preset","ultrafast","-crf","28",
-                "-c:a","aac","-b:a","192k","-ar","44100","-map_metadata","-1",
+                "-t", f"{voice_duration:.3f}", "-shortest","-c:v","libx264","-preset","ultrafast","-tune","zerolatency","-crf","30",
+                "-threads","2","-filter_complex_threads","2","-c:a","aac","-b:a","128k","-ar","44100","-map_metadata","-1",
                 "-movflags","+faststart",str(output_path)]
-    run_command(command, timeout=420)
+    run_command(command, timeout=900)
     if not output_path.exists() or output_path.stat().st_size == 0:
         fail("MP4 ဖိုင် မထွက်လာပါ။")
     audio_check = run_command(["ffprobe","-v","error","-select_streams","a:0","-show_entries","stream=codec_name","-of","default=noprint_wrappers=1:nokey=1",str(output_path)], timeout=30).strip()
