@@ -598,7 +598,9 @@ def render_video(video_path, voice_path, srt_path, output_path, options, music_p
         command += ["-i", str(logo_path)]
         logo_index = 3 if music_index is not None else 2
 
-    # Build one graph so mirror, regional blur, subtitles, and image watermark work together.
+    # Build one graph so mirror, regional blur, optional subtitles, and image watermark work together.
+    subtitles_on = str(options.get("subtitles_on", True)).lower() not in ("false", "0", "off", "no")
+    subtitle_filter = "subtitles=filename='" + srt_name + "'" if subtitles_on else "null"
     graph = []
     pre = ",".join(base_filters) if base_filters else "null"
     if blur > 0:
