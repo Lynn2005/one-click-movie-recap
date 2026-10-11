@@ -88,7 +88,7 @@ HTML = r"""
 :root{color-scheme:dark;--page:#080d18;--page2:#0c1424;--text:#f4f7ff;--panel:#101a2c;--panel2:#142139;--border:#263650;--muted:#b8c5d9;--muted2:#8192ad;--field:#0a1323;--field-border:#344865;--button:#5d8cff;--button-text:#071226;--status:#0a1424;--accent:#70a5ff;--accent2:#83e2d0;--shadow:0 18px 50px #0003}
 *{box-sizing:border-box}
 html{min-height:100%;background:var(--page)}
-body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 50% -20%,#1a3154 0,transparent 48%),var(--page);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,Arial,"Noto Sans Myanmar",sans-serif;transition:background .2s,color .2s}
+body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 50% -20%,#1a3154 0,transparent 48%),var(--page);color:var(--text);font-family:"Zawgyi-One","Padauk","Noto Sans Myanmar",sans-serif;transition:background .2s,color .2s}
 body.light{color-scheme:light;--page:#f2f5fb;--page2:#eaf0fa;--text:#17233a;--panel:#fff;--panel2:#f7f9fe;--border:#dce4f0;--muted:#465772;--muted2:#70809a;--field:#fbfcff;--field-border:#cbd6e7;--button:#315fe6;--button-text:#fff;--status:#f0f4fb;--accent:#315fe6;--accent2:#168a80;--shadow:0 18px 50px #243c6412;background:radial-gradient(ellipse at 50% -20%,#dbe7ff 0,transparent 48%),var(--page)}
 main{width:min(100% - 36px,1000px);margin:0 auto;padding:24px 0 42px}
 .topbar{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:0 0 20px;border-bottom:1px solid var(--border)}
@@ -494,8 +494,8 @@ def make_subtitles(script, voice_path, srt_path, video_path=None, options=None):
         f.write("\ufeff[Script Info]\nScriptType: v4.00+\nWrapStyle: 0\nScaledBorderAndShadow: yes\n")
         f.write(f"PlayResX: {width}\nPlayResY: {height}\n\n[V4+ Styles]\n")
         f.write("Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n")
-        # Padauk is installed in the Docker image and supports Unicode Myanmar shaping.
-        font_family = "Padauk"
+        # Try Zawgyi-One as requested; Docker installs the font file.
+        font_family = "Zawgyi-One"
         f.write(f"Style: Default,{font_family},{render_size},{color},&H000000FF,&H00000000,&H80000000,{bold},0,1,{outline},1,5,{round(width*0.03)},{round(width*0.03)},10,1\n")
         logo_text = (options.get("logo_text") or "").strip().replace("{","(").replace("}",")").replace("\n"," ")
         if logo_text:
@@ -539,9 +539,10 @@ def render_video(video_path, voice_path, srt_path, output_path, options, music_p
     if options.get("auto_effect", True):
         base_filters.append("eq=contrast=1.04:saturation=1.06")
 
-    # Use the same Unicode Myanmar font for subtitles, watermark, and overlay text.
-    # Padauk is installed by the Docker image (fonts-sil-padauk).
-    font_path = "/usr/share/fonts/truetype/padauk/Padauk-Regular.ttf"
+    # Use Zawgyi-One for video overlays/subtitles as requested.
+    font_path = "/usr/share/fonts/truetype/zawgyi/Zawgyi-One.ttf"
+    if not Path(font_path).is_file():
+        font_path = "/usr/share/fonts/truetype/padauk/Padauk-Regular.ttf"
     if not Path(font_path).is_file():
         font_path = "/usr/share/fonts/truetype/noto/NotoSansMyanmar-Regular.ttf"
     if overlay:
@@ -564,14 +565,13 @@ def render_video(video_path, voice_path, srt_path, output_path, options, music_p
         graph.append("[0:v:0]" + pre + ",split=2[vclean][vblur_src]")
         crop_x = f"max(0,min(iw-iw*{bw/100},iw*{bx/100}-iw*{bw/100}/2))"
         crop_y = f"max(0,min(ih-ih*{bh/100},ih*{by/100}-ih*{bh/100}/2))"
-        graph.append(f"[vblur_src]crop=w=iw*{bw/100}:h=ih*{bh/100}:x='{crop_x}':y='{crop_y}',boxblur={max(1,blur*2)}:1[vblur]")
+        graph.append(f"[vblur_src]crop=w=iw*{bw/100}:h=ih*{bh/100}:x='{crop_x}':y='{crop_y}',gblur=sigma={max(1,blur*2)}:steps=2,format=yuv420p[vblur]")
         # Use the same clamped top-left coordinates for crop and overlay.
         # Without this, dragging the box near an edge makes the final blur drift
         # away from the Live Edit preview because crop() clamps but overlay() did not.
         overlay_x = f"W*{max(0, min(1-bw/100, bx/100-bw/200))}"
-        # Move the final blur box upward by exactly 100 source-video pixels.
-        # 'by' is the box centre percentage, so subtract the pixel offset before clamping.
-        overlay_y = f"max(0,min(H-H*{bh/100},H*{by/100}-H*{bh/200}-100))"
+        # Keep the exported blur exactly aligned with the preview box.
+        overlay_y = f"H*{max(0, min(1-bh/100, by/100-bh/200))}"
         graph.append(f"[vclean][vblur]overlay=x='{overlay_x}':y='{overlay_y}':eof_action=repeat[vblurred]")
         graph.append("[vblurred]subtitles=filename='" + srt_name + "'[vbase]")
     else:
@@ -580,7 +580,7 @@ def render_video(video_path, voice_path, srt_path, output_path, options, music_p
     if logo_index is not None:
         lx, ly = int(options.get("logo_x",90)), int(options.get("logo_y",8))
         op = max(10,min(100,int(options.get("logo_opacity",100))))/100
-        graph.append(f"[{logo_index}:v:0][vbase]scale2ref=w=main_w*{max(5,min(40,int(options.get('logo_w',18))))/100}:h=main_h*{max(5,min(40,int(options.get('logo_w',18))))/100}:force_original_aspect_ratio=decrease[logo][vref]")
+        graph.append(f"[{logo_index}:v:0][vbase]scale2ref=w=oh*mdar:h=ih*{max(5,min(40,int(options.get('logo_w',18))))/100}[logo][vref]")
         graph.append("[logo]format=rgba,colorchannelmixer=aa=" + str(op) + "[logoalpha]")
         graph.append("[vref][logoalpha]overlay=x='W*" + str(lx/100) + "-w/2':y='H*" + str(ly/100) + "-h/2':eof_action=repeat[vout]")
     else:
