@@ -600,14 +600,15 @@ def render_video(video_path, voice_path, srt_path, output_path, options, music_p
     if blur > 0:
         graph.append("[0:v:0]" + pre + ",split=2[vclean][vblur_src]")
         crop_x = f"max(0,min(iw-iw*{bw/100},iw*{bx/100}-iw*{bw/100}/2))"
-        crop_y = f"max(0,min(ih-ih*{bh/100},ih*{by/100}-ih*{bh/100}/2))"
+        # Final exported blur is shifted upward by 100 video pixels.
+        crop_y = f"max(0,min(ih-ih*{bh/100},ih*{by/100}-ih*{bh/100}/2-100))"
         graph.append(f"[vblur_src]crop=w=iw*{bw/100}:h=ih*{bh/100}:x='{crop_x}':y='{crop_y}',gblur=sigma={max(1,blur)}:steps=2,format=yuv420p[vblur]")
         # Use the same clamped top-left coordinates for crop and overlay.
         # Without this, dragging the box near an edge makes the final blur drift
         # away from the Live Edit preview because crop() clamps but overlay() did not.
         overlay_x = f"W*{max(0, min(1-bw/100, bx/100-bw/200))}"
         # Keep the exported blur exactly aligned with the preview box.
-        overlay_y = f"H*{max(0, min(1-bh/100, by/100-bh/200))}"
+        overlay_y = f"max(0,min(H-h,H*{by/100}-H*{bh/100}/2-100))"
         graph.append(f"[vclean][vblur]overlay=x='{overlay_x}':y='{overlay_y}':eof_action=repeat[vblurred]")
         graph.append("[vblurred]subtitles=filename='" + srt_name + "'[vbase]")
     else:
