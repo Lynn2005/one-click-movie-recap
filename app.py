@@ -225,7 +225,8 @@ def make_recap(transcript, language, api_key):
     if not chunks:
         fail("Transcript စာသား မရပါ။")
 
-    endpoint = "https://generativelanguage.googleapis.com/v1beta/models/" + GEMINI_MODEL + ":generateContent"
+    # Retry temporary overloads, then try alternate Gemini models automatically.
+    model_candidates = list(dict.fromkeys([GEMINI_MODEL, "gemini-3.7-flash", "gemini-3.5-flash-lite"]))
     sections = []
     for index, chunk in enumerate(chunks):
         position = "first" if index == 0 else ("last" if index == len(chunks)-1 else "middle")
@@ -238,27 +239,51 @@ def make_recap(transcript, language, api_key):
             "Use clear spoken language and natural punctuation (။ and ၊ for Burmese). No headings, labels, timestamps, bullet points, or copied dialogue. "
             "Make this section concise but complete, around 100-180 words when the source segment supports it. "
             "For the first segment, start the story naturally; for the last segment, finish the events shown in this segment without inventing an ending. "
-            "Output only narration text.\n\nTRANSCRIPT SEGMENT:\n" + chunk
+            "Output only narration text.\\n\\nTRANSCRIPT SEGMENT:\\n" + chunk
         )
-        response = requests.post(endpoint, params={"key": api_key},
-            json={"contents": [{"parts": [{"text": prompt}]}],
-                  "generationConfig": {"maxOutputTokens": 3500, "thinkingConfig": {"thinkingLevel": "LOW"}}},
-            timeout=120)
-        if response.status_code == 429:
-            # Explain quota exhaustion clearly instead of showing a long raw API response.
-            error_text = response.text[:3000]
-            retry_match = re.search(r"retry in ([0-9hms. ]+)", error_text, re.IGNORECASE)
-            retry_hint = (" Google က " + retry_match.group(1).strip() + " နောက်မှ ပြန်စမ်းရန် ပြထားသည်။") if retry_match else " Google AI Studio မှာ quota ပြန်ရမည့်အချိန်ကို စစ်ပါ။"
-            fail("Gemini Free Tier request quota ပြည့်သွားပါပြီ (429). ဒီအချိန်မှာ app က Gemini ကို ဆက်မခေါ်နိုင်ပါ။" + retry_hint + " ခဏစောင့်ပြီး ပြန်စမ်းပါ၊ သို့မဟုတ် Google AI Studio မှာ usage/billing ကို စစ်ပါ။")
-        if response.status_code >= 400:
-            fail("Gemini 3.8 Flash API error (" + str(response.status_code) + "): " + response.text[:600])
+        response = None
+        used_model = None
+        last_error = ""
+        for model in model_candidates:
+            endpoint = "https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent"
+            for attempt, delay in enumerate((0, 1.5, 3, 6)):
+                if delay:
+                    time.sleep(delay)
+                try:
+                    response = requests.post(endpoint, params={"key": api_key},
+                        json={"contents": [{"parts": [{"text": prompt}]}],
+                              "generationConfig": {"maxOutputTokens": 3500, "thinkingConfig": {"thinkingLevel": "LOW"}}},
+                        timeout=120)
+                except requests.RequestException as exc:
+                    last_error = str(exc)
+                    continue
+                if response.status_code == 429:
+                    error_text = response.text[:3000]
+                    retry_match = re.search(r"retry in ([0-9hms. ]+)", error_text, re.IGNORECASE)
+                    retry_hint = (" Google က " + retry_match.group(1).strip() + " နောက်မှ ပြန်စမ်းရန် ပြထားသည်။") if retry_match else " Google AI Studio မှာ usage/quota ကို စစ်ပါ။"
+                    fail("Gemini API quota/rate limit (429) ဖြစ်နေသည်။" + retry_hint + " ခဏစောင့်ပြီး ပြန်စမ်းပါ။")
+                if response.status_code == 200:
+                    used_model = model
+                    break
+                last_error = "HTTP " + str(response.status_code) + ": " + response.text[:400]
+                # Retry temporary overloads; if still overloaded, move to the next model.
+                if response.status_code in (500, 502, 503, 504):
+                    continue
+                # A model that is unavailable/not enabled should not block fallback models.
+                if response.status_code == 404:
+                    break
+                fail("Gemini API error (" + str(response.status_code) + "): " + response.text[:600])
+            if used_model:
+                break
+        if not used_model or response is None or response.status_code != 200:
+            fail("Gemini models များမှ တုံ့ပြန်မှု မရပါ။ အဓိက model အလုပ်များနေပြီး fallback မော်ဒယ်များလည်း မရနိုင်ပါ။ နောက်မှ ပြန်စမ်းပါ။ အသေးစိတ်: " + last_error[:300])
         data = response.json()
         try:
             section = "".join(part.get("text", "") for part in data["candidates"][0]["content"]["parts"]).strip()
         except (KeyError, IndexError, TypeError):
-            fail("Gemini 3.8 Flash မှ recap အပိုင်း " + str(index+1) + " ကို မရပါ။ API quota/model access ကို စစ်ပါ။")
+            fail("Gemini " + used_model + " မှ recap အပိုင်း " + str(index+1) + " ကို မရပါ။ API quota/model access ကို စစ်ပါ။")
         if not section:
-            fail("Gemini 3.8 Flash က recap အပိုင်း " + str(index+1) + " ကို အလွတ်ပြန်ပေးထားသည်။")
+            fail("Gemini " + used_model + " က recap အပိုင်း " + str(index+1) + " ကို အလွတ်ပြန်ပေးထားသည်။")
         sections.append(section)
     return "\n\n".join(sections)
 
