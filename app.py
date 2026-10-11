@@ -42,6 +42,7 @@ label{display:block;margin:7px 0 4px;font-weight:700;font-size:13px}input,select
 button,.download{display:inline-block;border:0;border-radius:8px;background:var(--button);color:var(--button-text);font-weight:800;padding:10px 12px;font-size:14px;text-decoration:none;cursor:pointer;width:100%;margin-top:10px}
 button:disabled{opacity:.55;cursor:wait}.key-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}.status{padding:10px;border-radius:8px;background:var(--status);white-space:pre-wrap;overflow-wrap:anywhere}.topbar{display:flex;align-items:center;justify-content:space-between;gap:10px}.topbar h1{font-size:20px}.settings-btn{width:auto;margin:0;padding:8px 10px;white-space:nowrap}.settings-wrap{position:fixed;z-index:20;inset:0;background:#0009;display:flex;justify-content:flex-end;align-items:flex-start;padding:12px}.settings-card{width:min(340px,100%);max-height:90vh;overflow:auto;background:var(--panel);border:1px solid var(--field-border);border-radius:12px;padding:14px;box-shadow:0 12px 40px #0008}.settings-head{display:flex;justify-content:space-between;align-items:center;gap:10px}.settings-head h2{margin:0}.close-btn{width:auto;margin:0;padding:5px 10px;background:#35415a;color:white}.settings-card label{margin-top:12px}.key-input-row{display:flex;gap:6px;align-items:stretch}.key-input-row input{flex:1;min-width:0}.key-input-row .toggle-key{width:76px;flex:0 0 76px;margin:0;padding:6px;font-size:12px;background:#35415a;color:#fff}.settings-card .muted{margin-top:8px}
 .note{border-left:3px solid #e8b85b;padding-left:12px}.small{font-size:13px}.hidden{display:none}.wizard-step{display:none}.wizard-step.active{display:block}.step-head{display:flex;align-items:center;gap:10px;margin:2px 0 14px}.step-number{display:inline-flex;align-items:center;justify-content:center;min-width:32px;height:32px;border-radius:50%;background:var(--button);color:var(--button-text);font-weight:800}.step-title{font-size:18px;font-weight:800}.step-desc{font-size:12px;color:var(--muted2);margin-top:3px}.wizard-nav{display:flex;gap:8px;margin-top:16px}.wizard-nav button{width:100%;margin-top:0}.wizard-nav .back{background:#35415a;color:#fff}.step-progress{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin:14px 0}.step-progress span{height:5px;border-radius:8px;background:var(--border)}.step-progress span.on{background:var(--button)}a{color:#9fb4ff}
+#blurBox,.preview-logo,.blur-box{display:none!important}.edit-adjustments > div:has(#blur),.edit-adjustments > .option-grid:has(#logoText),.edit-adjustments > div:has(#logoText),.edit-adjustments > label:has(+ #logoImage),#logoImage{display:none!important}
 </style>
 </head>
 <body><main>
@@ -363,7 +364,7 @@ def make_subtitles(script, voice_path, srt_path, video_path=None, options=None):
 
 def render_video(video_path, voice_path, srt_path, output_path, options, music_path=None, logo_path=None):
     srt_name = str(srt_path).replace("\\", "\\\\").replace(":", "\\:").replace("'", "\\'")
-    blur = max(0, min(10, int(options.get("blur", 0))))
+    blur = 0
     bx = max(0, min(100, int(options.get("blur_x", 50))))
     by = max(0, min(100, int(options.get("blur_y", 84))))
     bw = max(10, min(100, int(options.get("blur_w", 55))))
@@ -372,7 +373,7 @@ def render_video(video_path, voice_path, srt_path, output_path, options, music_p
     def esc_text(value):
         return value.replace("\\", "\\\\").replace(":", "\\:").replace("'", "\\'").replace("%", "\\%").replace(",", "\\,")
 
-    logo = (options.get("logo_text") or "").strip()
+    logo = ""
     overlay = (options.get("overlay_text") or "").strip()
     base_filters = []
     if options.get("mirror"):
@@ -534,7 +535,7 @@ def create_job():
         if uploaded_file and not uploaded_file.filename:
             uploaded_file = None
         music_file = request.files.get("music")
-        logo_file = request.files.get("logo_image")
+        logo_file = None
         if logo_file and not logo_file.filename: logo_file = None
         if music_file and not music_file.filename:
             music_file = None
@@ -553,7 +554,7 @@ def create_job():
     allowed_voices = ("my-MM-NilarNeural", "en-US-AriaNeural", "en-US-GuyNeural", "en-GB-SoniaNeural")
     if options.get("voice") not in allowed_voices: options["voice"] = "my-MM-NilarNeural" if language == "my" else "en-US-AriaNeural"
     try:
-        options["blur"] = max(0, min(10, int(options.get("blur", 0))))
+        options["blur"] = 0
         options["sub_size"] = max(14, min(36, int(options.get("sub_size", 20))))
     except (TypeError, ValueError):
         return jsonify({"error": "Video edit setting မမှန်ပါ။"}), 400
@@ -565,7 +566,7 @@ def create_job():
         options["music_volume"] = max(0, min(100, int(options.get("music_volume", 20))))
     except (TypeError, ValueError):
         options["music_volume"] = 20
-    options["logo_text"] = str(options.get("logo_text", ""))[:40]
+    options["logo_text"] = ""
     for key, default, low, high in (("blur_x",50,0,100),("blur_y",84,0,100),("blur_w",55,10,100),("blur_h",12,5,50),("sub_x",50,5,95),("sub_y",88,5,95),("sub_outline",2,0,6),("logo_x",90,0,100),("logo_y",8,0,100),("logo_opacity",100,10,100)):
         try: options[key] = max(low, min(high, int(options.get(key, default))))
         except (TypeError, ValueError): options[key] = default
