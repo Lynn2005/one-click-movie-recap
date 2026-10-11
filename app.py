@@ -452,19 +452,19 @@ def make_subtitles(script, voice_path, srt_path, video_path=None, options=None):
     x = round(width * max(5, min(95, int(options.get("sub_x", 50)))) / 100)
     default_y = {"bottom":88,"middle":50,"top":20}.get(options.get("sub_position"),88)
     y = round(height * max(5, min(95, int(options.get("sub_y", default_y))) ) / 100)
-    size = max(14, min(36, int(options.get("sub_size",20))))
-    # Scale subtitle font to the source video height (720p reference).
-    render_size = max(14, round(size * height / 720))
+    size = max(20, min(64, int(options.get("sub_size",40))))
+    # Match live preview sizing: use slider units as source-video pixels.
+    render_size = size
     color = options.get("sub_color","&H00FFFFFF")
     bold = -1 if options.get("sub_weight","bold") == "bold" else 0
     outline = max(0,min(6,int(options.get("sub_outline",2))))
     with open(srt_path, "w", encoding="utf-8") as f:
-        f.write("[Script Info]\nScriptType: v4.00+\nWrapStyle: 2\nScaledBorderAndShadow: yes\n")
+        f.write("[Script Info]\nScriptType: v4.00+\nWrapStyle: 0\nScaledBorderAndShadow: yes\n")
         f.write(f"PlayResX: {width}\nPlayResY: {height}\n\n[V4+ Styles]\n")
         f.write("Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n")
         # Padauk is installed in the Docker image and supports Unicode Myanmar shaping.
         font_family = "Padauk"
-        f.write(f"Style: Default,{font_family},{render_size},{color},&H000000FF,&H00000000,&H80000000,{bold},0,1,{outline},1,5,10,10,10,1\n")
+        f.write(f"Style: Default,{font_family},{render_size},{color},&H000000FF,&H00000000,&H80000000,{bold},0,1,{outline},1,5,{round(width*0.03)},{round(width*0.03)},10,1\\n")
         logo_text = (options.get("logo_text") or "").strip().replace("{","(").replace("}",")").replace("\n"," ")
         if logo_text:
             logo_width = max(5, min(60, int(options.get("logo_w",18))))
@@ -539,7 +539,7 @@ def render_video(video_path, voice_path, srt_path, output_path, options, music_p
         overlay_x = f"W*{max(0, min(1-bw/100, bx/100-bw/200))}"
         # Move the final blur box upward by exactly 100 source-video pixels.
         # 'by' is the box centre percentage, so subtract the pixel offset before clamping.
-        overlay_y = f"max(0,min(H-H*{bh/100},H*{by/100}-H*{bh/200}-100))"
+        overlay_y = f"max(0,min(H-H*{bh/100},H*{by/100}-H*{bh/200}))"
         graph.append(f"[vclean][vblur]overlay=x='{overlay_x}':y='{overlay_y}':eof_action=repeat[vblurred]")
         graph.append("[vblurred]subtitles=filename='" + srt_name + "'[vbase]")
     else:
@@ -548,9 +548,9 @@ def render_video(video_path, voice_path, srt_path, output_path, options, music_p
     if logo_index is not None:
         lx, ly = int(options.get("logo_x",90)), int(options.get("logo_y",8))
         op = max(10,min(100,int(options.get("logo_opacity",100))))/100
-        graph.append(f"[{logo_index}:v:0][vbase]scale2ref=w=main_w*0.18:h=main_h*0.18:force_original_aspect_ratio=decrease[logo][vref]")
+        graph.append(f"[{logo_index}:v:0]scale=w='min(iw,main_w*0.18)':h=-1[logo]")
         graph.append("[logo]format=rgba,colorchannelmixer=aa=" + str(op) + "[logoalpha]")
-        graph.append("[vref][logoalpha]overlay=x='W*" + str(lx/100) + "-w/2':y='H*" + str(ly/100) + "-h/2':eof_action=repeat[vout]")
+        graph.append("[vbase][logoalpha]overlay=x='W*" + str(lx/100) + "-w/2':y='H*" + str(ly/100) + "-h/2':eof_action=repeat[vout]")
     else:
         graph.append("[vbase]null[vout]")
 
