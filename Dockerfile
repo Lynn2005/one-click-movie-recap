@@ -10,10 +10,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     fonts-noto-extra \
     fonts-sil-padauk \
     fontconfig \
-    curl \
-    ca-certificates \
-    && mkdir -p /usr/share/fonts/truetype/zawgyi \
-    && curl -L --fail --retry 3 "https://raw.githubusercontent.com/yathit/waitzar/master/release_1.5/Zawgyi-One.ttf" -o /usr/share/fonts/truetype/zawgyi/Zawgyi-One.ttf \
     && fc-cache -f \
     && rm -rf /var/lib/apt/lists/*
 
