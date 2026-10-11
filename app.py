@@ -239,7 +239,7 @@ def make_recap(transcript, language, api_key):
             "Use clear spoken language and natural punctuation (။ and ၊ for Burmese). No headings, labels, timestamps, bullet points, or copied dialogue. "
             "Make this section concise but complete, around 100-180 words when the source segment supports it. "
             "For the first segment, start the story naturally; for the last segment, finish the events shown in this segment without inventing an ending. "
-            "Output only narration text.\\n\\nTRANSCRIPT SEGMENT:\\n" + chunk
+            "Output only narration text.\n\nTRANSCRIPT SEGMENT:\n" + chunk
         )
         response = None
         used_model = None
