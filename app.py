@@ -1,4 +1,5 @@
 import ipaddress
+import io
 import json
 import os
 import re
@@ -119,7 +120,7 @@ button:disabled{opacity:.55;cursor:wait}.key-actions{display:grid;grid-template-
 <div class="wizard-nav"><button type="button" class="next-step" data-next="1">Next → Voice</button></div></section>
 <section class="wizard-step" data-step="1"><div class="step-head"><span class="step-number">2</span><div><div class="step-title">Voice & Language</div><div class="step-desc">Recap ဘာသာနဲ့ AI အသံ ရွေးပါ</div></div></div>
 <div class="option-grid"><div><label for="language">Recap ဘာသာ</label><select id="language" name="language"><option value="my">မြန်မာ</option><option value="en">English</option></select></div><div><label for="voice">Voice</label><select id="voice" name="voice"><option value="my-MM-NilarNeural">မြန်မာ Nilar (မိန်းမသံ)</option><option value="my-MM-ThihaNeural">မြန်မာ Thiha (ယောက်ျားသံ)</option><option value="en-US-AriaNeural">English Aria</option><option value="en-US-GuyNeural">English Guy</option><option value="en-GB-SoniaNeural">English Sonia</option></select></div></div>
-<label for="voiceSpeed">AI Voice Speed <span id="voiceSpeedValue">100%</span></label><input id="voiceSpeed" name="voice_speed" type="range" min="70" max="130" step="5" value="100"><p class="muted small">70% = ဖြည်းဖြည်း · 100% = ပုံမှန် · 130% = မြန်မြန်။ ဒီနှုန်းနဲ့ AI Voice MP3 ထုတ်ပါမယ်။</p>
+<label for="voiceSpeed">AI Voice Speed <span id="voiceSpeedValue">100%</span></label><input id="voiceSpeed" name="voice_speed" type="range" min="70" max="130" step="5" value="100"><p class="muted small">70% = ဖြည်းဖြည်း · 100% = ပုံမှန် · 130% = မြန်မြန်။ ဒီနှုန်းနဲ့ AI Voice MP3 ထုတ်ပါမယ်။</p><button type="button" id="testVoiceBtn">🔊 အသံအစမ်းနားထောင်ရန်</button><audio id="testVoiceAudio" controls preload="none" style="display:none;width:100%;margin-top:8px"></audio><p id="testVoiceStatus" class="muted small">Voice နဲ့ Speed ကို ရွေးပြီး အသံစမ်းနားထောင်နိုင်ပါတယ်။</p>
 <div class="wizard-nav"><button type="button" class="back back-step" data-back="0">← Back</button><button type="button" class="next-step" data-next="2">Next → Edit Tools</button></div></section>
 <section class="wizard-step" data-step="2"><div class="step-head"><span class="step-number">3</span><div><div class="step-title">Edit Tools</div><div class="step-desc">Subtitle, logo, lighting နဲ့ music ချိန်ပါ</div></div></div>
 <div class="preview-title">👁️ Live Edit Preview</div><div class="preview" id="preview"><video id="previewVideo" playsinline class="hidden"></video><div class="preview-logo" id="previewLogo"><img id="previewLogoImage" alt="Logo preview"><span id="previewLogoText">My Recap</span></div><div class="preview-text" id="previewText"></div><div class="blur-box" id="blurBox"><span class="resize-handle" id="blurResize" aria-label="Blur width"></span><span class="resize-handle blur-height-handle" id="blurHeightResize" aria-label="Blur height"></span></div><div class="preview-overlay"><div class="preview-subtitle" id="previewSubtitle">Subtitle Preview<span class="resize-handle" id="subtitleResize" aria-label="Resize subtitle"></span></div></div></div><div class="playback-controls"><button id="previewPlay" type="button">▶ Play</button><input id="previewSeek" type="range" min="0" max="1000" value="0" aria-label="Video seek"><span class="playback-time" id="previewTime">0:00 / 0:00</span></div><p class="muted preview-hint" id="previewHint">Upload Video ရွေးပါ။ အောက်က Edit Tools ပြောင်းတာနဲ့ ဒီမှာပြောင်းလဲမှုကို ကြည့်နိုင်ပါတယ်။</p>
@@ -148,7 +149,7 @@ bindDrag(previewLogo,'logoX','logoY',null,null,0,0);bindDrag(previewSubtitle,'su
 // Removed music controls; no listener needed.
 let currentStep=0;function showStep(n){currentStep=Math.max(0,Math.min(3,n));document.querySelectorAll('.wizard-step').forEach(el=>el.classList.toggle('active',Number(el.dataset.step)===currentStep));document.querySelectorAll('.step-progress span').forEach((el,i)=>el.classList.toggle('on',i<=currentStep));window.scrollTo(0,0);}document.querySelectorAll('.next-step').forEach(el=>el.addEventListener('click',()=>{if(currentStep===0){const url=document.getElementById('url').value.trim(),file=document.getElementById('videoFile').files[0];if((!url&&!file)||(url&&file)){alert('Video URL သို့မဟုတ် Upload Video တစ်ခုကို ရွေးပါ။');return;}}showStep(Number(el.dataset.next));}));document.querySelectorAll('.back-step').forEach(el=>el.addEventListener('click',()=>showStep(Number(el.dataset.back))));
 previewVideo.addEventListener('loadedmetadata',()=>{if(previewVideo.videoWidth>0&&previewVideo.videoHeight>0){const preview=document.getElementById('preview'),ratio=previewVideo.videoWidth/previewVideo.videoHeight;preview.style.aspectRatio=previewVideo.videoWidth+'/'+previewVideo.videoHeight;preview.style.width='min(100%, calc(70vh * '+ratio+'))';preview.style.maxHeight='none';updatePreview();}});function loadPreviewSource(){const preview=document.getElementById('preview');preview.style.aspectRatio='16/9';preview.style.width='100%';preview.style.maxHeight='70vh';const file=document.getElementById('videoFile').files[0],url=document.getElementById('url').value.trim();if(previewVideo.dataset.objectUrl){URL.revokeObjectURL(previewVideo.dataset.objectUrl);previewVideo.dataset.objectUrl='';}previewVideo.pause();previewVideo.removeAttribute('src');if(file){previewVideo.dataset.objectUrl=URL.createObjectURL(file);previewVideo.src=previewVideo.dataset.objectUrl;previewVideo.classList.remove('hidden');previewPlay.classList.remove('hidden');previewSeek.classList.remove('hidden');previewVideo.load();document.getElementById('previewHint').textContent='Upload Video ကို တိုက်ရိုက်ပြထားပါတယ်။ Subtitle Preview ကို ဖုန်းမျက်နှာပြင်နဲ့ကိုက်ညီအောင် ချိန်ထားပါတယ်။ Subtitle/Logo ကို ဖိဆွဲရွှေ့နိုင်ပါတယ်။';}else if(url&&/\.(mp4|webm|mov|m4v)(\?|#|$)/i.test(url)){previewVideo.src=url;previewVideo.classList.remove('hidden');previewPlay.classList.remove('hidden');previewSeek.classList.remove('hidden');previewVideo.load();document.getElementById('previewHint').textContent='URL Preview — direct video link ဖြစ်ရပါမယ်။ YouTube/TikTok webpage link များကို browser preview မှာ တိုက်ရိုက်မဖွင့်နိုင်နိုင်ပါ။';}else{previewVideo.classList.add('hidden');previewPlay.classList.add('hidden');previewSeek.classList.add('hidden');document.getElementById('previewHint').textContent='Upload Video ရွေးပါ သို့မဟုတ် တိုက်ရိုက် MP4 URL ထည့်ပါ။';}syncPlayback();updatePreview();}document.getElementById('videoFile').addEventListener('change',loadPreviewSource);document.getElementById('url').addEventListener('change',loadPreviewSource);document.getElementById('url').addEventListener('input',()=>{if(!document.getElementById('videoFile').files[0]){clearTimeout(window.previewUrlTimer);window.previewUrlTimer=setTimeout(loadPreviewSource,700);}});
-document.getElementById('language').addEventListener('change',()=>{const v=document.getElementById('voice');if(document.getElementById('language').value==='my'){if(!v.value.startsWith('my-MM-'))v.value='my-MM-NilarNeural';}else if(v.value.startsWith('my-MM-'))v.value='en-US-AriaNeural';});const voiceSpeed=document.getElementById('voiceSpeed');voiceSpeed.addEventListener('input',()=>{document.getElementById('voiceSpeedValue').textContent=voiceSpeed.value+'%';});updatePreview();
+document.getElementById('language').addEventListener('change',()=>{const v=document.getElementById('voice');if(document.getElementById('language').value==='my'){if(!v.value.startsWith('my-MM-'))v.value='my-MM-NilarNeural';}else if(v.value.startsWith('my-MM-'))v.value='en-US-AriaNeural';});const voiceSpeed=document.getElementById('voiceSpeed');voiceSpeed.addEventListener('input',()=>{document.getElementById('voiceSpeedValue').textContent=voiceSpeed.value+'%';});document.getElementById('testVoiceBtn').addEventListener('click',async()=>{const testBtn=document.getElementById('testVoiceBtn'),testStatus=document.getElementById('testVoiceStatus'),testAudio=document.getElementById('testVoiceAudio');testBtn.disabled=true;testStatus.textContent='အသံအစမ်းဖန်တီးနေသည်…';try{const response=await fetch('/api/voice-preview',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({voice:document.getElementById('voice').value,language:document.getElementById('language').value,speed:voiceSpeed.value})});if(!response.ok){let err={};try{err=await response.json();}catch(e){}throw new Error(err.error||'အသံအစမ်းမရပါ');}const blob=await response.blob();if(testAudio.dataset.url)URL.revokeObjectURL(testAudio.dataset.url);testAudio.dataset.url=URL.createObjectURL(blob);testAudio.src=testAudio.dataset.url;testAudio.style.display='block';testStatus.textContent='အသံအစမ်းအဆင်သင့်ပါပြီ။ Play ကိုနှိပ်ပြီး နားထောင်ပါ။';await testAudio.play().catch(()=>{});}catch(err){testStatus.textContent='မအောင်မြင်ပါ: '+err.message;}finally{testBtn.disabled=false;}});updatePreview();
 function loadSavedKeys(){try{geminiInput.value=localStorage.getItem('oneclick_gemini_key')||'';groqInput.value=localStorage.getItem('oneclick_groq_key')||'';keyStatus.textContent=(geminiInput.value&&groqInput.value)?'ဒီ Browser ထဲမှာ Key နှစ်ခုလုံး သိမ်းထားသည်။':'Key မသိမ်းရသေးပါ။';}catch(e){keyStatus.textContent='ဒီ Browser မှာ local storage အသုံးပြုမရပါ။';}}
 document.getElementById('saveKeys').addEventListener('click',()=>{const g=geminiInput.value.trim(),q=groqInput.value.trim();if(!g||!q){keyStatus.textContent='Gemini နဲ့ Groq Key နှစ်ခုလုံး ထည့်ပါ။';return;}try{localStorage.setItem('oneclick_gemini_key',g);localStorage.setItem('oneclick_groq_key',q);keyStatus.textContent='Key နှစ်ခုလုံးကို ဒီ Browser ထဲမှာ Save လုပ်ပြီးပါပြီ။';}catch(e){keyStatus.textContent='Save မလုပ်နိုင်ပါ။ Browser storage setting ကို စစ်ပါ။';}});
 document.getElementById('clearKeys').addEventListener('click',()=>{try{localStorage.removeItem('oneclick_gemini_key');localStorage.removeItem('oneclick_groq_key');}catch(e){}geminiInput.value='';groqInput.value='';keyStatus.textContent='Browser ထဲက Saved Keys ကို ဖျက်ပြီးပါပြီ။';});
@@ -638,6 +639,36 @@ def process_job(job_id, url, language, workdir, gemini_api_key, groq_api_key, op
 @app.get("/")
 def index():
     return render_template_string(HTML)
+
+@app.post("/api/voice-preview")
+def create_voice_preview():
+    from flask import request
+    data = request.get_json(silent=True) or {}
+    language = data.get("language", "my")
+    voice = data.get("voice", "my-MM-NilarNeural")
+    allowed = {"my-MM-NilarNeural", "my-MM-ThihaNeural", "en-US-AriaNeural", "en-US-GuyNeural", "en-GB-SoniaNeural"}
+    if voice not in allowed:
+        return jsonify({"error": "Voice ရွေးချယ်မှု မမှန်ပါ။"}), 400
+    try:
+        speed = max(70, min(130, int(data.get("speed", 100))))
+    except (TypeError, ValueError):
+        speed = 100
+    rate = f"{speed - 100:+d}%"
+    sample = "မင်္ဂလာပါ။ ဒီအသံက သီဟနဲ့ နီလာ AI Voice ကို အစမ်းနားထောင်ဖို့ ဖြစ်ပါတယ်။" if language == "my" else "Hello! This is a short voice preview."
+    async def render_sample():
+        chunks = []
+        communicate = edge_tts.Communicate(sample, voice, rate=rate)
+        async for chunk in communicate.stream():
+            if chunk.get("type") == "audio":
+                chunks.append(chunk.get("data", b""))
+        return b"".join(chunks)
+    try:
+        audio_bytes = __import__("asyncio").run(render_sample())
+    except Exception as exc:
+        return jsonify({"error": "အသံအစမ်းထုတ်မရပါ။ ခဏနောက် ပြန်စမ်းပါ။ " + str(exc)[:180]}), 502
+    if not audio_bytes:
+        return jsonify({"error": "AI Voice မှ အသံအချက်အလက် မရပါ။"}), 502
+    return send_file(io.BytesIO(audio_bytes), mimetype="audio/mpeg", download_name="voice-preview.mp3", as_attachment=False)
 
 @app.get("/health")
 def health():
