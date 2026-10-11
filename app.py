@@ -150,7 +150,7 @@ loadSavedKeys();
 form.addEventListener('submit',async(e)=>{e.preventDefault();const geminiKey=geminiInput.value.trim(),groqKey=groqInput.value.trim(),videoFile=document.getElementById('videoFile').files[0],videoUrl=document.getElementById('url').value.trim();if(!geminiKey||!groqKey){result.classList.remove('hidden');statusBox.textContent='အရင်ဆုံး API Key Settings မှာ Gemini နဲ့ Groq Key နှစ်ခုလုံးထည့်ပြီး Save Keys ကိုနှိပ်ပါ။';return;}if((!videoUrl&&!videoFile)||(videoUrl&&videoFile)){result.classList.remove('hidden');statusBox.textContent='Video URL သို့မဟုတ် Upload Video တစ်ခုကိုပဲ ရွေးပါ။';return;}btn.disabled=true;result.classList.remove('hidden');links.innerHTML='';statusBox.textContent='အလုပ်စတင်နေသည်…';
 try{const body=new FormData();const options={voice:document.getElementById('voice').value,auto_effect:document.getElementById('autoEffect').checked,blur:document.getElementById('blur').value,blur_x:document.getElementById('blurX').value,blur_y:document.getElementById('blurY').value,blur_w:document.getElementById('blurW').value,blur_h:document.getElementById('blurH').value,mirror:document.getElementById('mirror').checked,sub_size:document.getElementById('subSize').value,sub_color:document.getElementById('subColor').value,sub_position:document.getElementById('subPosition').value,sub_x:document.getElementById('subX').value,sub_y:document.getElementById('subY').value,sub_weight:document.getElementById('subWeight').value,sub_outline:document.getElementById('subOutline').value,logo_text:document.getElementById('logoText').value,logo_x:document.getElementById('logoX').value,logo_y:document.getElementById('logoY').value,logo_opacity:document.getElementById('logoOpacity').value,overlay_text:document.getElementById('overlayText').value,};body.append('url',videoFile?'':videoUrl);body.append('language',document.getElementById('language').value);body.append('gemini_api_key',geminiKey);body.append('groq_api_key',groqKey);Object.entries(options).forEach(([k,v])=>body.append(k,String(v)));if(videoFile)body.append('video',videoFile);const logoFile=document.getElementById('logoImage').files[0];if(logoFile)body.append('logo_image',logoFile);const res=await fetch('/api/jobs',{method:'POST',body});const data=await res.json();if(!res.ok)throw new Error(data.error||'စတင်၍မရပါ');poll(data.id);}catch(err){statusBox.textContent='အမှား: '+err.message;btn.disabled=false;}});
 async function poll(id){try{const res=await fetch('/api/jobs/'+id);const data=await res.json();if(!res.ok){if(res.status===404){statusBox.textContent='အရင် Job ကို server မှာ မတွေ့တော့ပါ။ Render restart/redeploy ဖြစ်ခဲ့နိုင်ပါတယ်။ Video ရွေးထားဆဲဆိုရင် Generate Final Video ကို ထပ်နှိပ်ပြီး Job အသစ်စတင်ပါ။';links.innerHTML='';btn.disabled=false;showStep(3);return;}throw new Error(data.error||'အခြေအနေမရပါ');}statusBox.textContent=data.message||data.status;
-if(data.status==='done'){links.innerHTML='<a class="download" href="/api/jobs/'+id+'/download">MP4 ဒေါင်းလုဒ်လုပ်ရန်</a><a class="download" style="background:#35415a;color:#fff" href="/api/jobs/'+id+'/script">Recap Script ကိုဖတ်ရန်</a>';btn.disabled=false;showStep(3);statusBox.scrollIntoView({behavior:'smooth',block:'center'});return;}
+if(data.status==='done'){links.innerHTML='<a class="download" href="/api/jobs/'+id+'/download">MP4 ဒေါင်းလုဒ်လုပ်ရန်</a><a class="download" style="background:#35415a;color:#fff" href="/api/jobs/'+id+'/script">Recap Script ကိုဖတ်ရန်</a><a class="download" style="background:#237a57;color:#fff" href="/api/jobs/'+id+'/srt">SRT Subtitle ဒေါင်းလုဒ်လုပ်ရန်</a><a class="download" style="background:#7652b8;color:#fff" href="/api/jobs/'+id+'/voice">AI Voice MP3 ဒေါင်းလုဒ်လုပ်ရန်</a>';btn.disabled=false;showStep(3);statusBox.scrollIntoView({behavior:'smooth',block:'center'});return;}
 if(data.status==='error'){statusBox.textContent='မအောင်မြင်ပါ: '+data.message;btn.disabled=false;return;}setTimeout(()=>poll(id),3000);
 }catch(err){statusBox.textContent='အခြေအနေစစ်ရာတွင် ပြဿနာ: '+err.message;btn.disabled=false;}}
 </script></body></html>
@@ -727,6 +727,39 @@ def download_job(job_id):
     if not path.is_file() or path.parent.parent != OUTPUT_ROOT:
         abort(404)
     return send_file(path, as_attachment=True, download_name="movie_recap.mp4", mimetype="video/mp4")
+
+@app.get("/api/jobs/<job_id>/srt")
+def srt_job(job_id):
+    with JOBS_LOCK:
+        job = JOBS.get(job_id)
+    if not job or job.get("status") != "done":
+        abort(404)
+    path = Path(job.get("srt", ""))
+    if not path.is_file() or path.parent.parent != OUTPUT_ROOT:
+        abort(404)
+    return send_file(path, as_attachment=True, download_name="recap.srt", mimetype="application/x-subrip; charset=utf-8")
+
+@app.get("/api/jobs/<job_id>/voice")
+def voice_job(job_id):
+    with JOBS_LOCK:
+        job = JOBS.get(job_id)
+    if not job or job.get("status") != "done":
+        abort(404)
+    path = Path(job.get("voice", ""))
+    if not path.is_file() or path.parent.parent != OUTPUT_ROOT:
+        abort(404)
+    return send_file(path, as_attachment=True, download_name="ai_voice.mp3", mimetype="audio/mpeg")
+
+@app.get("/api/latest/<kind>")
+def latest_artifact(kind):
+    files = {"script": ("script.txt", "text/plain; charset=utf-8"), "srt": ("recap.srt", "application/x-subrip; charset=utf-8"), "voice": ("ai_voice.mp3", "audio/mpeg")}
+    if kind not in files:
+        abort(404)
+    filename, mimetype = files[kind]
+    path = LATEST_ROOT / filename
+    if not path.is_file() or path.stat().st_size == 0:
+        abort(404)
+    return send_file(path, as_attachment=True, download_name=filename, mimetype=mimetype)
 
 @app.get("/api/jobs/<job_id>/script")
 def script_job(job_id):
