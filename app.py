@@ -2,6 +2,7 @@ import ipaddress
 import json
 import os
 import re
+import shutil
 import socket
 import sqlite3
 import subprocess
@@ -33,6 +34,8 @@ DATA_ROOT = Path(os.getenv("MOVIE_RECAP_DATA_DIR") or (Path(tempfile.gettempdir(
 DATA_ROOT.mkdir(parents=True, exist_ok=True)
 OUTPUT_ROOT = DATA_ROOT / "movie-recap-jobs"
 OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
+LATEST_ROOT = DATA_ROOT / "latest-artifacts"
+LATEST_ROOT.mkdir(parents=True, exist_ok=True)
 JOB_DB = DATA_ROOT / "jobs.sqlite3"
 
 def _db_connect():
@@ -92,7 +95,7 @@ button:disabled{opacity:.55;cursor:wait}.key-actions{display:grid;grid-template-
 </style>
 </head>
 <body><main>
-<div class="topbar"><h1>🎬 One Click Movie Recap</h1><div style="display:flex;gap:7px;align-items:center"><button class="settings-btn" id="themeToggle" type="button" aria-label="Toggle light and dark theme">☀️ Light</button><button class="settings-btn" id="openSettings" type="button">⚙️ Settings</button></div></div>
+<div class="topbar"><div style="display:flex;align-items:center;gap:8px;min-width:0"><button class="settings-btn" id="newJobBtn" type="button">＋ New</button><h1>🎬 One Click Movie Recap</h1></div><div style="display:flex;gap:7px;align-items:center"><button class="settings-btn" id="themeToggle" type="button" aria-label="Toggle light and dark theme">☀️ Light</button><button class="settings-btn" id="openSettings" type="button">⚙️ Settings</button></div></div>
 <p class="muted">Video ထည့်ပါ → Recap MP4 ထုတ်ပါ</p>
 <div class="settings-wrap hidden" id="settingsWrap"><div class="settings-card"><div class="settings-head"><h2>⚙️ API Keys</h2><button class="close-btn" id="closeSettings" type="button">✕</button></div>
 <label for="geminiKey">Gemini API Key</label>
@@ -129,6 +132,7 @@ button:disabled{opacity:.55;cursor:wait}.key-actions{display:grid;grid-template-
 </main>
 <script>
 const form=document.getElementById('jobform'),btn=document.getElementById('submit'),result=document.getElementById('result'),statusBox=document.getElementById('status'),links=document.getElementById('links');
+document.getElementById('newJobBtn').addEventListener('click',()=>{if(btn.disabled&&!confirm('လက်ရှိလုပ်ဆောင်နေသော Job ကို စောင့်မနေဘဲ စာမျက်နှာအသစ်ဖွင့်မလား။'))return;window.location.reload();});
 const geminiInput=document.getElementById('geminiKey'),groqInput=document.getElementById('groqKey'),keyStatus=document.getElementById('keyStatus');
 const settingsWrap=document.getElementById('settingsWrap');const themeToggle=document.getElementById('themeToggle');function applyTheme(theme){document.body.classList.toggle('light',theme==='light');themeToggle.textContent=theme==='light'?'🌙 Dark':'☀️ Light';try{localStorage.setItem('oneclick_theme',theme);}catch(e){}}let savedTheme='dark';try{savedTheme=localStorage.getItem('oneclick_theme')||'dark';}catch(e){}applyTheme(savedTheme);themeToggle.addEventListener('click',()=>applyTheme(document.body.classList.contains('light')?'dark':'light'));document.getElementById('openSettings').addEventListener('click',()=>settingsWrap.classList.remove('hidden'));function bindKeyToggle(buttonId,input){const toggle=document.getElementById(buttonId);toggle.addEventListener('click',()=>{const showing=input.type==='text';input.type=showing?'password':'text';toggle.textContent=showing?'ကြည့်ရန်':'ဖျောက်ရန်';toggle.setAttribute('aria-label',(showing?'Show':'Hide')+' API key');});}bindKeyToggle('toggleGeminiKey',geminiInput);bindKeyToggle('toggleGroqKey',groqInput);document.getElementById('closeSettings').addEventListener('click',()=>settingsWrap.classList.add('hidden'));settingsWrap.addEventListener('click',e=>{if(e.target===settingsWrap)settingsWrap.classList.add('hidden');});
 const previewVideo=document.getElementById('previewVideo'),previewLogo=document.getElementById('previewLogo'),previewText=document.getElementById('previewText'),previewSubtitle=document.getElementById('previewSubtitle');const previewPlay=document.getElementById('previewPlay'),previewSeek=document.getElementById('previewSeek'),previewTime=document.getElementById('previewTime');function timeLabel(s){if(!Number.isFinite(s))s=0;return Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0')}function syncPlayback(){const d=previewVideo.duration||0;previewSeek.value=d?Math.round(previewVideo.currentTime/d*1000):0;previewTime.textContent=timeLabel(previewVideo.currentTime)+' / '+timeLabel(d);previewPlay.textContent=previewVideo.paused?'▶ Play':'❚❚ Pause'}previewPlay.addEventListener('click',()=>{if(previewVideo.paused)previewVideo.play().catch(()=>{});else previewVideo.pause();syncPlayback()});previewSeek.addEventListener('input',()=>{if(previewVideo.duration)previewVideo.currentTime=(+previewSeek.value/1000)*previewVideo.duration});['timeupdate','durationchange','play','pause','ended'].forEach(ev=>previewVideo.addEventListener(ev,syncPlayback));
@@ -512,6 +516,49 @@ def render_video(video_path, voice_path, srt_path, output_path, options, music_p
     if not audio_check:
         fail("Final MP4 ထဲမှာ Audio Stream မပါပါ။")
 
+
+def make_srt(script, voice_path, srt_path):
+    """Create SRT timings proportionally to the generated voice duration."""
+    duration_text = run_command(["ffprobe", "-v", "error", "-show_entries", "format=duration",
+                                 "-of", "default=noprint_wrappers=1:nokey=1", str(voice_path)], timeout=30)
+    duration = float(duration_text)
+    chunks = [chunk.strip() for chunk in split_sentences(clean_myanmar_text(script)) if chunk.strip()]
+    if duration <= 0 or not chunks:
+        fail("SRT ဖိုင်ဖန်တီးရန် Voice duration သို့မဟုတ် Script မမှန်ပါ။")
+    weights = [max(1, len(chunk)) for chunk in chunks]
+    total = sum(weights)
+    current = 0.0
+    with open(srt_path, "w", encoding="utf-8") as handle:
+        for index, pair in enumerate(zip(chunks, weights), start=1):
+            chunk, weight = pair
+            start = current
+            current += duration * weight / total
+            end = min(duration, current)
+            safe = chunk.replace("-->", "→").replace("\\n", " ")
+            handle.write(str(index) + "\\n" + seconds_to_srt(start) + " --> " + seconds_to_srt(end) + "\\n" + safe + "\\n\\n")
+
+def save_latest_artifacts(workdir):
+    """Replace the saved script/SRT/voice only when a new set is ready."""
+    mapping = {"recap.txt": "script.txt", "recap.srt": "recap.srt", "recap_voice.mp3": "ai_voice.mp3"}
+    staged = []
+    try:
+        for source_name, target_name in mapping.items():
+            source = workdir / source_name
+            if not source.is_file() or source.stat().st_size == 0:
+                fail("သိမ်းဆည်းရန်လိုအပ်သော ဖိုင် မရှိပါ: " + source_name)
+            temp_target = LATEST_ROOT / (target_name + ".new")
+            shutil.copy2(source, temp_target)
+            staged.append((temp_target, LATEST_ROOT / target_name))
+        for temp_target, final_target in staged:
+            os.replace(temp_target, final_target)
+    except Exception:
+        for temp_target, final_target in staged:
+            try:
+                temp_target.unlink(missing_ok=True)
+            except OSError:
+                pass
+        raise
+
 def update_job(job_id, **fields):
     with JOBS_LOCK:
         if job_id in JOBS:
@@ -560,17 +607,20 @@ def process_job(job_id, url, language, workdir, gemini_api_key, groq_api_key, op
         if logo_path:
             options["logo_text"] = ""
         make_subtitles(script, voice, subtitles, video, options)
+        srt_file = workdir / "recap.srt"
+        make_srt(script, voice, srt_file)
 
         update_job(job_id, message="နောက်ဆုံး MP4 ကို တည်ဆောက်နေသည်။ ခဏစောင့်ပါ…")
         render_video(video, voice, subtitles, output, options, music_path, logo_path)
-        update_job(job_id, status="done", message="ပြီးပါပြီ။ MP4 ကို ဒေါင်းလုဒ်လုပ်နိုင်ပါပြီ။",
-                   output=str(output), script=str(workdir / "recap.txt"), finished=time.time())
+        save_latest_artifacts(workdir)
+        update_job(job_id, status="done", message="ပြီးပါပြီ။ MP4, Script, SRT နဲ့ AI Voice ကို ဒေါင်းလုဒ်လုပ်နိုင်ပါပြီ။",
+                   output=str(output), script=str(workdir / "recap.txt"), srt=str(srt_file), voice=str(voice), finished=time.time())
     except Exception as exc:
         update_job(job_id, status="error", message=str(exc)[:1500], finished=time.time())
     finally:
         # Keep only completed outputs temporarily for download; remove source and intermediates.
         try:
-            for name in ("source.mp4", "source.mp3", "recap_voice.mp3", "recap.ass", "background_music", "logo_image"):
+            for name in ("source.mp4", "source.mp3", "background_music", "logo_image"):
                 path = workdir / name
                 if path.exists():
                     path.unlink()
