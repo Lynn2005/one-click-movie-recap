@@ -462,9 +462,8 @@ def make_subtitles(script, voice_path, srt_path, video_path=None, options=None):
         f.write("[Script Info]\nScriptType: v4.00+\nWrapStyle: 2\nScaledBorderAndShadow: yes\n")
         f.write(f"PlayResX: {width}\nPlayResY: {height}\n\n[V4+ Styles]\n")
         f.write("Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n")
-        # Use the user's uploaded A ka 08 font when bundled in fonts/; keep a safe fallback.
-        custom_font = Path(__file__).resolve().parent / "fonts" / "eka-08-regular.ttf"
-        font_family = "A ka 08" if custom_font.is_file() else "Noto Sans Myanmar"
+        # Padauk is installed in the Docker image and supports Unicode Myanmar shaping.
+        font_family = "Padauk"
         f.write(f"Style: Default,{font_family},{render_size},{color},&H000000FF,&H00000000,&H80000000,{bold},0,1,{outline},1,5,10,10,10,1\n")
         logo_text = (options.get("logo_text") or "").strip().replace("{","(").replace("}",")").replace("\n"," ")
         if logo_text:
@@ -474,7 +473,7 @@ def make_subtitles(script, voice_path, srt_path, video_path=None, options=None):
             logo_y = round(height * max(0, min(100, int(options.get("logo_y",8)))) / 100)
             logo_opacity = max(10, min(100, int(options.get("logo_opacity",100))))
             logo_alpha = round(255 * (100-logo_opacity) / 100)
-            f.write(f"Style: Logo,Noto Sans Myanmar,{logo_size},&H{logo_alpha:02X}FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,1,1,0,5,10,10,10,1\n")
+            f.write(f"Style: Logo,{font_family},{logo_size},&H{logo_alpha:02X}FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,1,1,0,5,10,10,10,1\n")
         f.write("\n[Events]\n")
         f.write("Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n")
         current = 0.0
@@ -508,10 +507,11 @@ def render_video(video_path, voice_path, srt_path, output_path, options, music_p
     if options.get("auto_effect", True):
         base_filters.append("eq=contrast=1.04:saturation=1.06")
 
-    # Text layers use the uploaded Myanmar font bundled in /app/fonts.
-    custom_font = Path(__file__).resolve().parent / "fonts" / "eka-08-regular.ttf"
-    font_path = str(custom_font) if custom_font.is_file() else "/usr/share/fonts/truetype/noto/NotoSansMyanmar-Regular.ttf"
-    # Overlay text uses Padauk too, so Burmese shaping matches the subtitles.
+    # Use the same Unicode Myanmar font for subtitles, watermark, and overlay text.
+    # Padauk is installed by the Docker image (fonts-sil-padauk).
+    font_path = "/usr/share/fonts/truetype/padauk/Padauk-Regular.ttf"
+    if not Path(font_path).is_file():
+        font_path = "/usr/share/fonts/truetype/noto/NotoSansMyanmar-Regular.ttf"
     if overlay:
         base_filters.append("drawtext=fontfile='" + font_path + "':text='" + esc_text(overlay) + "':fontcolor=white:fontsize=22:borderw=2:bordercolor=black:x=(w-text_w)/2:y=12")
 
@@ -537,7 +537,9 @@ def render_video(video_path, voice_path, srt_path, output_path, options, music_p
         # Without this, dragging the box near an edge makes the final blur drift
         # away from the Live Edit preview because crop() clamps but overlay() did not.
         overlay_x = f"W*{max(0, min(1-bw/100, bx/100-bw/200))}"
-        overlay_y = f"H*{max(0, min(1-bh/100, by/100-bh/200))}"
+        # Move the final blur box upward by exactly 100 source-video pixels.
+        # 'by' is the box centre percentage, so subtract the pixel offset before clamping.
+        overlay_y = f"max(0,min(H-H*{bh/100},H*{by/100}-H*{bh/200}-100))"
         graph.append(f"[vclean][vblur]overlay=x='{overlay_x}':y='{overlay_y}':eof_action=repeat[vblurred]")
         graph.append("[vblurred]subtitles=filename='" + srt_name + "'[vbase]")
     else:
@@ -558,8 +560,16 @@ def render_video(video_path, voice_path, srt_path, output_path, options, music_p
     else:
         graph.append("[1:a:0]loudnorm=I=-16:TP=-1.5:LRA=11[aout]")
 
+    # Use the AI voice duration as the master timeline. The video is trimmed to
+    # the same endpoint so the exported MP4, narration, and generated subtitles end together.
+    voice_duration_text = run_command(["ffprobe", "-v", "error", "-show_entries", "format=duration",
+                                       "-of", "default=noprint_wrappers=1:nokey=1", str(voice_path)], timeout=30)
+    try:
+        voice_duration = max(0.1, float(voice_duration_text))
+    except (TypeError, ValueError):
+        fail("AI Voice timeline duration ကို မဖတ်နိုင်ပါ။")
     command += ["-filter_complex",";".join(graph),"-map","[vout]","-map","[aout]",
-                "-shortest","-c:v","libx264","-preset","ultrafast","-crf","28",
+                "-t", f"{voice_duration:.3f}", "-shortest","-c:v","libx264","-preset","ultrafast","-crf","28",
                 "-c:a","aac","-b:a","192k","-ar","44100","-map_metadata","-1",
                 "-movflags","+faststart",str(output_path)]
     run_command(command, timeout=420)
@@ -740,7 +750,7 @@ def create_job():
         if uploaded_file and not uploaded_file.filename:
             uploaded_file = None
         music_file = request.files.get("music")
-        logo_file = None
+        logo_file = request.files.get("logo_image")
         if logo_file and not logo_file.filename: logo_file = None
         if music_file and not music_file.filename:
             music_file = None
@@ -773,7 +783,7 @@ def create_job():
         options["music_volume"] = max(0, min(100, int(options.get("music_volume", 20))))
     except (TypeError, ValueError):
         options["music_volume"] = 20
-    options["logo_text"] = ""
+    options["logo_text"] = str(options.get("logo_text", ""))[:40]
     for key, default, low, high in (("blur_x",50,0,100),("blur_y",84,0,100),("blur_w",55,10,100),("blur_h",12,5,50),("sub_x",50,5,95),("sub_y",88,5,95),("sub_outline",2,0,6),("logo_x",90,0,100),("logo_y",8,0,100),("logo_opacity",100,10,100)):
         try: options[key] = max(low, min(high, int(options.get(key, default))))
         except (TypeError, ValueError): options[key] = default
