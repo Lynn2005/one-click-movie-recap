@@ -451,7 +451,7 @@ def clean_myanmar_text(text):
     value = "".join(ch for ch in value if unicodedata.category(ch) != "Cf")
     value = value.replace("\ufeff", "")
     # Repair a common Zawgyi-order medial-ra sequence, e.g. "ြမန်" -> "မြန်".
-    value = re.sub(r"\u103c([\u1000-\u1021])", r"\1\u103c", value)
+    value = re.sub("ြ([က-အ])", r"\1ြ", value)
     return unicodedata.normalize("NFC", value)
 
 
