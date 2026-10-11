@@ -88,7 +88,7 @@ HTML = r"""
 :root{color-scheme:dark;--page:#080d18;--page2:#0c1424;--text:#f4f7ff;--panel:#101a2c;--panel2:#142139;--border:#263650;--muted:#b8c5d9;--muted2:#8192ad;--field:#0a1323;--field-border:#344865;--button:#5d8cff;--button-text:#071226;--status:#0a1424;--accent:#70a5ff;--accent2:#83e2d0;--shadow:0 18px 50px #0003}
 *{box-sizing:border-box}
 html{min-height:100%;background:var(--page)}
-body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 50% -20%,#1a3154 0,transparent 48%),var(--page);color:var(--text);font-family:"Padauk","Noto Sans Myanmar",sans-serif;transition:background .2s,color .2s}
+body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 50% -20%,#1a3154 0,transparent 48%),var(--page);color:var(--text);font-family:"Noto Sans Myanmar","Padauk",sans-serif;transition:background .2s,color .2s}
 body.light{color-scheme:light;--page:#f2f5fb;--page2:#eaf0fa;--text:#17233a;--panel:#fff;--panel2:#f7f9fe;--border:#dce4f0;--muted:#465772;--muted2:#70809a;--field:#fbfcff;--field-border:#cbd6e7;--button:#315fe6;--button-text:#fff;--status:#f0f4fb;--accent:#315fe6;--accent2:#168a80;--shadow:0 18px 50px #243c6412;background:radial-gradient(ellipse at 50% -20%,#dbe7ff 0,transparent 48%),var(--page)}
 main{width:min(100% - 36px,1000px);margin:0 auto;padding:24px 0 42px}
 .topbar{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:0 0 20px;border-bottom:1px solid var(--border)}
@@ -495,7 +495,7 @@ def make_subtitles(script, voice_path, srt_path, video_path=None, options=None):
         f.write(f"PlayResX: {width}\nPlayResY: {height}\n\n[V4+ Styles]\n")
         f.write("Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n")
         # Use Unicode Myanmar font (Padauk) for correct Unicode subtitle rendering.
-        font_family = "Padauk"
+        font_family = "Noto Sans Myanmar"
         f.write(f"Style: Default,{font_family},{render_size},{color},&H000000FF,&H00000000,&H80000000,{bold},0,1,{outline},1,5,{round(width*0.03)},{round(width*0.03)},10,1\n")
         logo_text = (options.get("logo_text") or "").strip().replace("{","(").replace("}",")").replace("\n"," ")
         if logo_text:
@@ -539,10 +539,10 @@ def render_video(video_path, voice_path, srt_path, output_path, options, music_p
     if options.get("auto_effect", True):
         base_filters.append("eq=contrast=1.04:saturation=1.06")
 
-    # Prefer Padauk, a Unicode Myanmar font, for overlays and subtitles.
-    font_path = "/usr/share/fonts/truetype/padauk/Padauk-Regular.ttf"
+    # Prefer Noto Sans Myanmar, a Unicode Myanmar font, for overlays and subtitles.
+    font_path = "/usr/share/fonts/truetype/noto/NotoSansMyanmar-Regular.ttf"
     if not Path(font_path).is_file():
-        font_path = "/usr/share/fonts/truetype/noto/NotoSansMyanmar-Regular.ttf"
+        font_path = "/usr/share/fonts/truetype/padauk/Padauk-Regular.ttf"
     if overlay:
         base_filters.append("drawtext=fontfile='" + font_path + "':text='" + esc_text(overlay) + "':fontcolor=white:fontsize=22:borderw=2:bordercolor=black:x=(w-text_w)/2:y=12")
 
