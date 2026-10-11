@@ -464,7 +464,7 @@ def make_subtitles(script, voice_path, srt_path, video_path=None, options=None):
         f.write("Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n")
         # Padauk is installed in the Docker image and supports Unicode Myanmar shaping.
         font_family = "Padauk"
-        f.write(f"Style: Default,{font_family},{render_size},{color},&H000000FF,&H00000000,&H80000000,{bold},0,1,{outline},1,5,{round(width*0.03)},{round(width*0.03)},10,1\\n")
+        f.write(f"Style: Default,{font_family},{render_size},{color},&H000000FF,&H00000000,&H80000000,{bold},0,1,{outline},1,5,{round(width*0.03)},{round(width*0.03)},10,1\n")
         logo_text = (options.get("logo_text") or "").strip().replace("{","(").replace("}",")").replace("\n"," ")
         if logo_text:
             logo_width = max(5, min(60, int(options.get("logo_w",18))))
@@ -548,9 +548,9 @@ def render_video(video_path, voice_path, srt_path, output_path, options, music_p
     if logo_index is not None:
         lx, ly = int(options.get("logo_x",90)), int(options.get("logo_y",8))
         op = max(10,min(100,int(options.get("logo_opacity",100))))/100
-        graph.append(f"[{logo_index}:v:0]scale=w='min(iw,main_w*0.18)':h=-1[logo]")
+        graph.append(f"[{logo_index}:v:0][vbase]scale2ref=w=main_w*0.18:h=main_h*0.18:force_original_aspect_ratio=decrease[logo][vref]")
         graph.append("[logo]format=rgba,colorchannelmixer=aa=" + str(op) + "[logoalpha]")
-        graph.append("[vbase][logoalpha]overlay=x='W*" + str(lx/100) + "-w/2':y='H*" + str(ly/100) + "-h/2':eof_action=repeat[vout]")
+        graph.append("[vref][logoalpha]overlay=x='W*" + str(lx/100) + "-w/2':y='H*" + str(ly/100) + "-h/2':eof_action=repeat[vout]")
     else:
         graph.append("[vbase]null[vout]")
 
