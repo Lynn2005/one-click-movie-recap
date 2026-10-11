@@ -444,18 +444,11 @@ def synthesize_voice(script, language, audio_path, voice, voice_speed=100):
     fail("AI Voice ဖန်တီးမရပါ။ Microsoft Edge TTS connection ကို ၃ ကြိမ် စမ်းပြီး မအောင်မြင်ပါ။ ခဏနောက်ပြန်စမ်းပါ။ Error: " + str(last_error)[:250])
 
 def clean_myanmar_text(text):
-    """Convert common Zawgyi input to Unicode and normalize Burmese text."""
+    """Only remove invisible formatting characters; do not guess-convert Myanmar text."""
     import unicodedata
     value = str(text or "")
     value = "".join(ch for ch in value if unicodedata.category(ch) != "Cf")
     value = value.replace("\ufeff", "")
-    # Use a real Zawgyi-to-Unicode converter rather than guessing character order.
-    try:
-        from burmese_tools import tools
-        value = tools.zaw2uni(value)
-    except Exception:
-        # Keep the app running if optional conversion is unavailable.
-        value = re.sub("ြ([က-အ])", lambda match: match.group(1) + "ြ", value)
     return unicodedata.normalize("NFC", value)
 
 
