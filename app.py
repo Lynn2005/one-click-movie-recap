@@ -310,11 +310,18 @@ main{padding-left:max(0px,env(safe-area-inset-left));padding-right:max(0px,env(s
 <nav class="stepper-cards" aria-label="Recap steps"><button type="button" class="stepper-item active" data-goto-step="0"><span class="stepper-circle">1</span><span class="stepper-label">MP4 Upload</span></button><button type="button" class="stepper-item" data-goto-step="1"><span class="stepper-circle">2</span><span class="stepper-label">မြန်မာ AI Voice</span></button><button type="button" class="stepper-item" data-goto-step="2"><span class="stepper-circle">3</span><span class="stepper-label">Final MP4</span></button></nav>
 <div class="step-progress" aria-label="Progress"><span class="on"></span><span></span><span></span></div>
 <section class="wizard-step active" data-step="0"><div class="step-head"><span class="step-number">1</span><div><div class="step-title">MP4 Upload</div><div class="step-desc">ဖုန်းထဲက MP4 တင်ပါ သို့မဟုတ် Video URL ထည့်ပါ</div></div></div>
-<label for="url">Option 1 — Video URL (Direct MP4 သို့မဟုတ် Public video link)</label>
-<input id="url" name="url" type="url" placeholder="https://... (MP4 / YouTube / Facebook / TikTok)">
-<p class="muted small">Direct MP4/MOV/WEBM နှင့် public YouTube, Facebook, TikTok, Instagram, Vimeo, Dailymotion link များကို စမ်းသုံးနိုင်သည်။ Login/private video များ မရနိုင်ပါ။</p>
-<label for="videoFile">Option 2 — ဖုန်းထဲက Video Upload (MP4 / MOV / WEBM / M4V)</label>
-<input id="videoFile" name="video" type="file" multiple accept=".mp4,.mov,.webm,.m4v,video/mp4,video/quicktime,video/webm">\n<p class="muted small" id="multiUploadHint">Video အများအပြားကို တစ်ခါတည်းရွေးနိုင်သည်။ အများဆုံး ၅ ဖိုင်၊ တစ်ဖိုင်လျှင် 80 MB အထိ။ ဖိုင်တစ်ခုစီကို သီးခြား Job အဖြစ် တစ်ပြိုင်နက် Processing လုပ်မည်။</p>
+<div style="margin:16px 0;padding:16px;border:1px solid var(--border);border-radius:14px;background:var(--panel2)">
+  <div style="font-size:17px;font-weight:750;margin-bottom:8px">🔗 Option 1 — Video URL ထည့်ရန်</div>
+  <label for="url">Video URL</label>
+  <input id="url" name="url" type="url" placeholder="https://... (MP4 / YouTube / Facebook / TikTok)" autocomplete="url" style="font-size:16px;min-height:48px">
+  <p class="muted small">Direct MP4/MOV/WEBM နှင့် public YouTube, Facebook, TikTok, Instagram, Vimeo, Dailymotion link များကို စမ်းသုံးနိုင်သည်။ Login/private video များ မရနိုင်ပါ။</p>
+ </div>
+ <div style="margin:16px 0;padding:16px;border:1px solid var(--border);border-radius:14px;background:var(--panel2)">
+  <div style="font-size:17px;font-weight:750;margin-bottom:8px">📁 Option 2 — ဖုန်းထဲက Video Upload</div>
+  <label for="videoFile">Video ဖိုင်ရွေးရန် (MP4 / MOV / WEBM / M4V)</label>
+  <input id="videoFile" name="video" type="file" multiple accept=".mp4,.mov,.webm,.m4v,video/mp4,video/quicktime,video/webm" style="font-size:16px;min-height:48px">
+  <p class="muted small" id="multiUploadHint">Video အများအပြားကို တစ်ခါတည်းရွေးနိုင်သည်။ အများဆုံး ၅ ဖိုင်၊ တစ်ဖိုင်လျှင် 80 MB အထိ။ ဖိုင်တစ်ခုစီကို သီးခြား Job အဖြစ် တစ်ပြိုင်နက် Processing လုပ်မည်။</p>
+ </div>
 <div class="wizard-nav"><button type="button" class="next-step" data-next="1">Next → Voice</button></div></section>
 <section class="wizard-step" data-step="1"><div class="step-head"><span class="step-number">2</span><div><div class="step-title">မြန်မာ AI Voice</div><div class="step-desc">မူရင်းအသံမှ စာသားထုတ်၊ မြန်မာ Recap ပြုလုပ်ပြီး AI Voice ထုတ်မည်</div></div></div>
 <div class="option-grid"><div><label for="language">Recap ဘာသာ</label><select id="language" name="language"><option value="my">မြန်မာ</option><option value="en">English</option></select></div><div><label for="voice">Voice</label><select id="voice" name="voice"><option value="my-MM-ThihaNeural" selected>မြန်မာ Thiha (ယောက်ျားသံ)</option><option value="my-MM-NilarNeural">မြန်မာ Nilar (မိန်းမသံ)</option></select></div><div><label for="voiceSpeed">AI Voice ပြောနှုန်း</label><select id="voiceSpeed" name="voice_speed"><option value="100">ပုံမှန် (100%)</option><option value="110">နည်းနည်းမြန် (110%)</option><option value="120" selected>မြန်မြန် (120%)</option><option value="130">အမြန်ဆုံး (130%)</option></select><p class="muted small">Default ကို ၂၀% မြန်အောင်ထားပြီး Voice ကို Video အရှည်အတိုင်း အတင်းမနှေးစေပါ။</p></div><div><label for="subtitlePace">SRT စာတန်းပြောနှုန်း (၃ စက္ကန့်ခန့်)</label><select id="subtitlePace" name="subtitle_pace"><option value="slow">ဖြည်းဖြည်း၊ ရှင်းရှင်း — ၁၀–၁၅ လုံး</option><option value="normal" selected>ပုံမှန် Recap — ၁၅–၂၅ လုံး</option><option value="fast">မြန်မြန်ပြော — ၂၅–၃၅ လုံး</option></select></div></div>
