@@ -778,7 +778,7 @@ def synthesize_voice(script, language, audio_path, voice, voice_speed=100, bound
                         if chunk.get("type") == "audio":
                             audio_file.write(chunk.get("data", b""))
                         elif chunk.get("type") == "WordBoundary":
-                            data = chunk.get("data", {})
+                            data = chunk.get("data", chunk)
                             try:
                                 boundaries.append({"offset": max(0.0, float(data.get("offset", 0))/10_000_000,
                                     "duration": max(0.0, float(data.get("duration", 0))/10_000_000),
