@@ -203,7 +203,7 @@ body.light{color-scheme:light;--page:#f2f5fb;--page2:#eaf0fa;--text:#17233a;--pa
 main{width:min(100% - 36px,1000px);margin:0 auto;padding:24px 0 42px}
 .topbar{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:0 0 20px;border-bottom:1px solid var(--border)}
 .topbar>div:first-child{gap:12px!important}.topbar h1{font-size:clamp(18px,2.4vw,25px);letter-spacing:-.6px;line-height:1.25;margin:0;font-weight:850}.topbar h1::first-letter{color:var(--accent)}
-.topbar>div:last-child{flex-shrink:0}.settings-btn{width:auto;margin:0;padding:9px 13px;white-space:nowrap;background:var(--panel2);border:1px solid var(--border);color:var(--text);border-radius:11px;font-size:12px}
+.topbar>div:last-child{flex-shrink:0}.topbar>div:last-child>#themeToggle,.topbar>div:last-child>#openSettings{padding:5px 8px;font-size:10px;min-height:28px;border-radius:8px;line-height:1.1}.settings-btn{width:auto;margin:0;padding:9px 13px;white-space:nowrap;background:var(--panel2);border:1px solid var(--border);color:var(--text);border-radius:11px;font-size:12px}
 main>.muted:not(.small){font-size:14px;margin:15px 0 20px;color:var(--muted)}
 .panel{background:linear-gradient(155deg,var(--panel),color-mix(in srgb,var(--panel) 91%,var(--accent) 9%));border:1px solid var(--border);border-radius:22px;padding:clamp(16px,3vw,30px);margin:16px 0;box-shadow:var(--shadow)}
 h1{font-size:24px;margin:0 0 6px}h2{font-size:19px;letter-spacing:-.25px;margin:0 0 12px}p{line-height:1.6;color:var(--muted);margin:9px 0}.muted{font-size:12px;color:var(--muted2)}
