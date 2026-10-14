@@ -818,10 +818,18 @@ def synthesize_voice(script, language, audio_path, voice, voice_speed=100, bound
                 break
         if len(audio_parts) != len(parts):
             fail("AI Voice ဖန်တီးမရပါ။ Myanmar TTS က အသံမပေးပါ။ ခဏနောက်ပြန်စမ်းပါ။ Error: " + str(last_error)[:250])
-        concat_file = temp_dir / "concat.txt"
-        concat_file.write_text("".join("file '" + str(p).replace("'", "'\\''") + "'\n" for p in audio_parts), encoding="utf-8")
-        run_command(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(concat_file),
-                     "-c:a", "libmp3lame", "-q:a", "3", str(audio_path)], timeout=300)
+        # Avoid concat demuxer manifest parsing entirely. Join each TTS segment
+        # through FFmpeg's audio concat filter, which does not depend on newline
+        # escaping or temporary concat.txt formatting.
+        concat_inputs = []
+        concat_labels = []
+        for index, part_path in enumerate(audio_parts):
+            concat_inputs.extend(["-i", str(part_path)])
+            concat_labels.append(f"[{index}:a]")
+        filter_graph = "".join(concat_labels) + f"concat=n={len(audio_parts)}:v=0:a=1[outa]"
+        run_command(["ffmpeg", "-y", *concat_inputs, "-filter_complex", filter_graph,
+                     "-map", "[outa]", "-c:a", "libmp3lame", "-q:a", "3", str(audio_path)],
+                    timeout=300)
         if not audio_path.exists() or audio_path.stat().st_size == 0:
             fail("AI Voice အသံဖိုင်ကို ပေါင်းစည်းမရပါ။")
         if boundaries_path:
