@@ -19,7 +19,7 @@ import requests
 from flask import Flask, jsonify, render_template_string, send_file, abort, redirect
 
 app = Flask(__name__)
-app.config["MAX_CONTENT_LENGTH"] = 82 * 1024 * 1024
+app.config["MAX_CONTENT_LENGTH"] = 82 * 1024 * 1024  # Each video is submitted separately; keep the existing per-request limit.
 
 # Keep the requested Gemini model fixed. No automatic model fallback.
 GEMINI_MODEL = "gemini-3.8-flash"
@@ -314,7 +314,7 @@ main{padding-left:max(0px,env(safe-area-inset-left));padding-right:max(0px,env(s
 <input id="url" name="url" type="url" placeholder="https://example.com/video.mp4">
 <p class="muted small">URL သို့မဟုတ် ဖုန်းထဲက Video တစ်ခုကို ရွေးပါ။</p>
 <label for="videoFile">Option 2 — ဖုန်းထဲက Video Upload (MP4 / MOV / WEBM / M4V)</label>
-<input id="videoFile" name="video" type="file" accept=".mp4,.mov,.webm,.m4v,video/mp4,video/quicktime,video/webm">
+<input id="videoFile" name="video" type="file" multiple accept=".mp4,.mov,.webm,.m4v,video/mp4,video/quicktime,video/webm">\n<p class="muted small" id="multiUploadHint">Video အများအပြားကို တစ်ခါတည်းရွေးနိုင်သည်။ အများဆုံး ၅ ဖိုင်၊ တစ်ဖိုင်လျှင် 80 MB အထိ။ ဖိုင်တစ်ခုစီကို သီးခြား Job အဖြစ် တစ်ပြိုင်နက် Processing လုပ်မည်။</p>
 <div class="wizard-nav"><button type="button" class="next-step" data-next="1">Next → Voice</button></div></section>
 <section class="wizard-step" data-step="1"><div class="step-head"><span class="step-number">2</span><div><div class="step-title">Voice & Language</div><div class="step-desc">Recap ဘာသာနဲ့ AI အသံ ရွေးပါ</div></div></div>
 <div class="option-grid"><div><label for="language">Recap ဘာသာ</label><select id="language" name="language"><option value="my">မြန်မာ</option><option value="en">English</option></select></div><div><label for="voice">Voice</label><select id="voice" name="voice"><option value="my-MM-NilarNeural">မြန်မာ Nilar (မိန်းမသံ)</option><option value="my-MM-ThihaNeural">မြန်မာ Thiha (ယောက်ျားသံ)</option></select></div><div><label for="voiceSpeed">AI Voice ပြောနှုန်း</label><select id="voiceSpeed" name="voice_speed"><option value="100">ပုံမှန် (100%)</option><option value="110">နည်းနည်းမြန် (110%)</option><option value="120" selected>မြန်မြန် (120%)</option><option value="130">အမြန်ဆုံး (130%)</option></select><p class="muted small">Default ကို ၂၀% မြန်အောင်ထားပြီး Voice ကို Video အရှည်အတိုင်း အတင်းမနှေးစေပါ။</p></div><div><label for="subtitlePace">SRT စာတန်းပြောနှုန်း (၃ စက္ကန့်ခန့်)</label><select id="subtitlePace" name="subtitle_pace"><option value="slow">ဖြည်းဖြည်း၊ ရှင်းရှင်း — ၁၀–၁၅ လုံး</option><option value="normal" selected>ပုံမှန် Recap — ၁၅–၂၅ လုံး</option><option value="fast">မြန်မြန်ပြော — ၂၅–၃၅ လုံး</option></select></div></div>
@@ -397,7 +397,60 @@ function loadSavedKeys(){try{geminiInput.value=localStorage.getItem('oneclick_ge
 document.getElementById('saveKeys').addEventListener('click',()=>{const g=geminiInput.value.trim(),q=groqInput.value.trim();if(!g||!q){keyStatus.textContent='Gemini နဲ့ Groq Key နှစ်ခုလုံး ထည့်ပါ။';return;}try{localStorage.setItem('oneclick_gemini_key',g);localStorage.setItem('oneclick_groq_key',q);keyStatus.textContent='Key နှစ်ခုလုံးကို ဒီ Browser ထဲမှာ Save လုပ်ပြီးပါပြီ။';}catch(e){keyStatus.textContent='Save မလုပ်နိုင်ပါ။ Browser storage setting ကို စစ်ပါ။';}});
 document.getElementById('clearKeys').addEventListener('click',()=>{try{localStorage.removeItem('oneclick_gemini_key');localStorage.removeItem('oneclick_groq_key');}catch(e){}geminiInput.value='';groqInput.value='';keyStatus.textContent='Browser ထဲက Saved Keys ကို ဖျက်ပြီးပါပြီ။';});
 loadSavedKeys();
-form.addEventListener('submit',async(e)=>{e.preventDefault();const geminiKey=geminiInput.value.trim(),groqKey=groqInput.value.trim(),videoFile=document.getElementById('videoFile').files[0],videoUrl=document.getElementById('url').value.trim();const recapScript=document.getElementById('recapScript')?.value.trim()||'';if(!recapScript&&(!geminiKey||!groqKey)){result.classList.remove('hidden');statusBox.textContent='Auto Recap အတွက် API Key Settings မှာ Gemini နဲ့ Groq Key နှစ်ခုလုံးထည့်ပြီး Save Keys ကိုနှိပ်ပါ။ ကိုယ်ပိုင် Script သုံးလျှင် API Key မလိုပါ။';return;}if((!videoUrl&&!videoFile)||(videoUrl&&videoFile)){result.classList.remove('hidden');statusBox.textContent='Video URL သို့မဟုတ် Upload Video တစ်ခုကိုပဲ ရွေးပါ။';return;}btn.disabled=true;result.classList.remove('hidden');links.innerHTML='';setProgress(0);statusBox.textContent='';
+async function submitMultipleVideos(files,geminiKey,groqKey){
+ const result=document.getElementById('result'),statusBox=document.getElementById('status'),links=document.getElementById('links'),btn=document.getElementById('generateBtn');
+ const recapScript=document.getElementById('recapScript')?.value.trim()||'';
+ const options={voice:document.getElementById('voice').value,voice_speed:document.getElementById('voiceSpeed').value,subtitle_pace:document.getElementById('subtitlePace').value,auto_effect:document.getElementById('autoEffect').checked,auto_blur_subtitles:document.getElementById('autoBlurSubtitles').checked,mirror:document.getElementById('mirror').checked,overlay_text:''};
+ const jobs=[];
+ result.classList.remove('hidden');links.innerHTML='';setProgress(0);btn.disabled=true;
+ statusBox.textContent='Video '+files.length+' ခုကို Upload လုပ်ပြီး Processing စတင်နေသည်…';
+ try{
+  for(let i=0;i<files.length;i++){
+   const file=files[i],body=new FormData();
+   body.append('url','');body.append('language',document.getElementById('language').value);
+   body.append('gemini_api_key',geminiKey);body.append('groq_api_key',groqKey);
+   Object.entries(options).forEach(([k,v])=>body.append(k,String(v)));
+   body.append('video',file);body.append('recap_script',recapScript);
+   statusBox.textContent='Upload လုပ်နေသည် ('+(i+1)+'/'+files.length+'): '+file.name;
+   const res=await fetch('/api/jobs',{method:'POST',body});
+   const data=await res.json();
+   if(!res.ok)throw new Error(file.name+': '+(data.error||'Job စတင်၍မရပါ'));
+   jobs.push({id:data.id,title:file.name,status:'queued',progress:0,message:''});
+  }
+  await pollMultipleJobs(jobs);
+ }catch(err){
+  statusBox.textContent='Multiple Upload အမှား: '+err.message+(jobs.length?'\\nစတင်ပြီးသော Job များ ဆက်လက်လုပ်ဆောင်နေပါသည်။':'');
+  if(jobs.length)pollMultipleJobs(jobs);else btn.disabled=false;
+ }
+}
+async function pollMultipleJobs(jobs){
+ const result=document.getElementById('result'),statusBox=document.getElementById('status'),links=document.getElementById('links'),btn=document.getElementById('generateBtn');
+ const escapeHtml=value=>String(value||'').replace(/[&<>"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
+ async function refresh(){
+  let total=0,finished=0;
+  for(const job of jobs){
+   if(job.status==='done'||job.status==='error') {total+=job.progress||0;finished++;continue;}
+   try{
+    const res=await fetch('/api/jobs/'+encodeURIComponent(job.id),{cache:'no-store'}),data=await res.json();
+    if(res.ok){job.status=data.status||job.status;job.progress=Number(data.progress)||0;job.message=data.message||'';}
+    else {job.status='error';job.message=data.error||'Job status မရပါ';}
+   }catch(err){job.message='Status စစ်နေသည်…';}
+   total+=job.progress||0;if(job.status==='done'||job.status==='error')finished++;
+  }
+  setProgress(Math.round(total/jobs.length));
+  statusBox.textContent='Multiple Processing: '+finished+'/'+jobs.length+' ခု ပြီးဆုံး/ရပ်တန့်ပြီး\\n'+jobs.map((j,i)=>(i+1)+'. '+j.title+' — '+(j.status==='done'?'ပြီးပါပြီ':j.status==='error'?'အမှား':(j.progress||0)+'% '+(j.message||'လုပ်ဆောင်နေသည်'))).join('\\n');
+  links.innerHTML=jobs.map((j,i)=>'<div style="border:1px solid var(--border);border-radius:12px;padding:12px;margin:10px 0;background:var(--panel2)"><strong>'+escapeHtml((i+1)+'. '+j.title)+'</strong><p class="muted small">'+(j.status==='done'?'ပြီးပါပြီ':j.status==='error'?'မအောင်မြင်ပါ':'Processing '+(j.progress||0)+'%')+'</p>'+(j.status==='done'?'<video controls playsinline preload="metadata" style="display:block;width:100%;max-height:55vh;aspect-ratio:16/9;object-fit:contain;background:#05070d;border-radius:12px;margin:10px 0" src="/api/jobs/'+encodeURIComponent(j.id)+'/preview"></video><a class="download" href="/api/jobs/'+encodeURIComponent(j.id)+'/download">⬇️ Final MP4 ဒေါင်းလုဒ်လုပ်ရန်</a>':j.status==='error'?'<p class="small">'+escapeHtml(j.message)+'</p>':'<p class="muted small">လုပ်ဆောင်နေသည်…</p>')+'</div>').join('');
+  if(finished===jobs.length){
+   btn.disabled=false;loadSavedVideos();
+   const back=document.createElement('button');back.type='button';back.className='back';back.textContent='← Video Upload သို့ ပြန်သွားရန်';back.style.background='var(--panel2)';back.style.color='var(--text)';back.style.borderColor='var(--border)';
+   back.addEventListener('click',()=>{document.getElementById('jobform').parentElement.style.display='';showStep(0);document.querySelector('.wizard-step[data-step="0"]')?.scrollIntoView({behavior:'smooth',block:'start'});});
+   links.prepend(back);statusBox.scrollIntoView({behavior:'smooth',block:'center'});return;
+  }
+  setTimeout(refresh,3000);
+ }
+ result.classList.remove('hidden');await refresh();
+}
+form.addEventListener('submit',async(e)=>{e.preventDefault();const geminiKey=geminiInput.value.trim(),groqKey=groqInput.value.trim(),videoFiles=Array.from(document.getElementById('videoFile').files||[]),videoFile=videoFiles[0],videoUrl=document.getElementById('url').value.trim();const recapScript=document.getElementById('recapScript')?.value.trim()||'';if(!recapScript&&(!geminiKey||!groqKey)){result.classList.remove('hidden');statusBox.textContent='Auto Recap အတွက် API Key Settings မှာ Gemini နဲ့ Groq Key နှစ်ခုလုံးထည့်ပြီး Save Keys ကိုနှိပ်ပါ။ ကိုယ်ပိုင် Script သုံးလျှင် API Key မလိုပါ။';return;}if((!videoUrl&&!videoFiles.length)||(videoUrl&&videoFiles.length)){result.classList.remove('hidden');statusBox.textContent='Video URL သို့မဟုတ် Upload Video ကိုသာ ရွေးပါ။';return;}if(videoFiles.length>5){result.classList.remove('hidden');statusBox.textContent='တစ်ကြိမ်လျှင် အများဆုံး Video ၅ ဖိုင်သာ ရွေးနိုင်သည်။';return;}if(videoFiles.some(file=>file.size>80*1024*1024)){result.classList.remove('hidden');statusBox.textContent='Video တစ်ဖိုင်ချင်းစီသည် 80 MB ထက် မကြီးရပါ။';return;}if(videoFiles.length>1){await submitMultipleVideos(videoFiles,geminiKey,groqKey);return;}btn.disabled=true;result.classList.remove('hidden');links.innerHTML='';setProgress(0);statusBox.textContent='';
 try{const body=new FormData();const options={voice:document.getElementById('voice').value,voice_speed:document.getElementById('voiceSpeed').value,subtitle_pace:document.getElementById('subtitlePace').value,auto_effect:document.getElementById('autoEffect').checked,auto_blur_subtitles:document.getElementById('autoBlurSubtitles').checked,mirror:document.getElementById('mirror').checked,overlay_text:''};body.append('url',videoFile?'':videoUrl);body.append('language',document.getElementById('language').value);body.append('gemini_api_key',geminiKey);body.append('groq_api_key',groqKey);Object.entries(options).forEach(([k,v])=>body.append(k,String(v)));if(videoFile)body.append('video',videoFile);body.append('recap_script',document.getElementById('recapScript')?.value.trim()||'');const res=await fetch('/api/jobs',{method:'POST',body});const data=await res.json();if(!res.ok)throw new Error(data.error||'စတင်၍မရပါ');poll(data.id);}catch(err){statusBox.textContent='အမှား: '+err.message;btn.disabled=false;}});
 async function poll(id){try{const res=await fetch('/api/jobs/'+id);const data=await res.json();if(!res.ok){if(res.status===404){statusBox.textContent='အရင် Job ကို server မှာ မတွေ့တော့ပါ။ Render restart/redeploy ဖြစ်ခဲ့နိုင်ပါတယ်။ Video ရွေးထားဆဲဆိုရင် Generate Final Video ကို ထပ်နှိပ်ပြီး Job အသစ်စတင်ပါ။';links.innerHTML='';btn.disabled=false;showStep(3);return;}throw new Error(data.error||'အခြေအနေမရပါ');}setProgress(data.progress??(data.status==='done'?100:0));statusBox.textContent=data.message|| (data.status==='queued'?'အလုပ်တန်းစီနေသည်…':data.status==='running'?'လုပ်ဆောင်နေသည်…':'');
 if(data.status==='done'){setProgress(100);loadSavedVideos();links.innerHTML='<button type="button" id="finalBackBtn" class="back" style="width:100%;margin-bottom:12px">← နောက်သို့ — Voice ပြန်သွားရန်</button><h3>🎬 Final Video Preview</h3><video id="finalVideoPreview" controls playsinline preload="metadata" style="display:block;width:100%;max-height:72vh;aspect-ratio:16/9;object-fit:contain;background:#05070d;border:1px solid #31435e;border-radius:14px;margin:10px 0" src="/api/jobs/'+id+'/preview"></video><a class="download" href="/api/jobs/'+id+'/download">⬇️ Final MP4 ဒေါင်းလုဒ်လုပ်ရန်</a>';document.getElementById('finalBackBtn').addEventListener('click',()=>{document.getElementById('jobform').parentElement.style.display='';showStep(1);document.querySelector('.wizard-step[data-step="1"]')?.scrollIntoView({behavior:'smooth',block:'start'});});document.getElementById('jobform').parentElement.style.display='none';document.querySelectorAll('main > p.muted').forEach(el=>el.style.display='none');let resultHeading=document.querySelector('#result h2');if(!resultHeading&&result){resultHeading=document.createElement('h2');result.prepend(resultHeading);}if(resultHeading)resultHeading.textContent='🎬 Final Video Preview';btn.disabled=false;showStep(3);statusBox.scrollIntoView({behavior:'smooth',block:'center'});return;}
