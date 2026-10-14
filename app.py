@@ -419,12 +419,12 @@ async function submitMultipleVideos(files,geminiKey,groqKey){
   }
   await pollMultipleJobs(jobs);
  }catch(err){
-  statusBox.textContent='Multiple Upload အမှား: '+err.message+(jobs.length?'\\nစတင်ပြီးသော Job များ ဆက်လက်လုပ်ဆောင်နေပါသည်။':'');
+  statusBox.textContent='Multiple Upload အမှား: '+err.message+(jobs.length?'\nစတင်ပြီးသော Job များ ဆက်လက်လုပ်ဆောင်နေပါသည်။':'');
   if(jobs.length)pollMultipleJobs(jobs);else btn.disabled=false;
  }
 }
 async function pollMultipleJobs(jobs){
- const result=document.getElementById('result'),statusBox=document.getElementById('status'),links=document.getElementById('links'),btn=document.getElementById('generateBtn');
+ const result=document.getElementById('result'),statusBox=document.getElementById('status'),links=document.getElementById('links'),btn=document.getElementById('submit');
  const escapeHtml=value=>String(value||'').replace(/[&<>"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
  async function refresh(){
   let total=0,finished=0;
@@ -438,7 +438,7 @@ async function pollMultipleJobs(jobs){
    total+=job.progress||0;if(job.status==='done'||job.status==='error')finished++;
   }
   setProgress(Math.round(total/jobs.length));
-  statusBox.textContent='Multiple Processing: '+finished+'/'+jobs.length+' ခု ပြီးဆုံး/ရပ်တန့်ပြီး\\n'+jobs.map((j,i)=>(i+1)+'. '+j.title+' — '+(j.status==='done'?'ပြီးပါပြီ':j.status==='error'?'အမှား':(j.progress||0)+'% '+(j.message||'လုပ်ဆောင်နေသည်'))).join('\\n');
+  statusBox.textContent='Multiple Processing: '+finished+'/'+jobs.length+' ခု ပြီးဆုံး/ရပ်တန့်ပြီး\\n'+jobs.map((j,i)=>(i+1)+'. '+j.title+' — '+(j.status==='done'?'ပြီးပါပြီ':j.status==='error'?'အမှား':(j.progress||0)+'% '+(j.message||'လုပ်ဆောင်နေသည်'))).join('\n');
   links.innerHTML=jobs.map((j,i)=>'<div style="border:1px solid var(--border);border-radius:12px;padding:12px;margin:10px 0;background:var(--panel2)"><strong>'+escapeHtml((i+1)+'. '+j.title)+'</strong><p class="muted small">'+(j.status==='done'?'ပြီးပါပြီ':j.status==='error'?'မအောင်မြင်ပါ':'Processing '+(j.progress||0)+'%')+'</p>'+(j.status==='done'?'<video controls playsinline preload="metadata" style="display:block;width:100%;max-height:55vh;aspect-ratio:16/9;object-fit:contain;background:#05070d;border-radius:12px;margin:10px 0" src="/api/jobs/'+encodeURIComponent(j.id)+'/preview"></video><a class="download" href="/api/jobs/'+encodeURIComponent(j.id)+'/download">⬇️ Final MP4 ဒေါင်းလုဒ်လုပ်ရန်</a>':j.status==='error'?'<p class="small">'+escapeHtml(j.message)+'</p>':'<p class="muted small">လုပ်ဆောင်နေသည်…</p>')+'</div>').join('');
   if(finished===jobs.length){
    btn.disabled=false;loadSavedVideos();
