@@ -39,54 +39,10 @@ LATEST_ROOT = DATA_ROOT / "latest-artifacts"
 LATEST_ROOT.mkdir(parents=True, exist_ok=True)
 JOB_DB = DATA_ROOT / "jobs.sqlite3"
 
-# Cloud Run's writable filesystem is ephemeral. Store completed MP4s in a private bucket.
-GCS_BUCKET_NAME = (os.getenv("GCS_BUCKET") or "").strip()
-_GCS_CLIENT = None
-_GCS_LOCK = threading.Lock()
-
-def _gcs_bucket():
-    global _GCS_CLIENT
-    if not GCS_BUCKET_NAME:
-        return None
-    with _GCS_LOCK:
-        if _GCS_CLIENT is None:
-            from google.cloud import storage
-            _GCS_CLIENT = storage.Client()
-    return _GCS_CLIENT.bucket(GCS_BUCKET_NAME)
-
-def _gcs_blob(job_id):
-    bucket = _gcs_bucket()
-    if bucket is None or not re.fullmatch(r"[a-f0-9]{32}", str(job_id)):
-        return None
-    return bucket.blob(f"final-videos/{job_id}.mp4")
-
-def _persist_final_video(job_id, output_path, title):
-    blob = _gcs_blob(job_id)
-    if blob is None:
-        return None
-    blob.metadata = {"title": str(title or "Movie Recap")[:180], "job_id": str(job_id), "created": str(time.time())}
-    blob.upload_from_filename(str(output_path), content_type="video/mp4", timeout=900)
-    return blob.name
-
 def _get_final_video_path(job_id, job=None):
-    expected = OUTPUT_ROOT / str(job_id) / "movie_recap.mp4"
-    if expected.is_file():
-        return expected
-    blob = _gcs_blob(job_id)
-    if blob is None:
-        return None
-    try:
-        if not blob.exists():
-            return None
-        cache_root = Path(tempfile.gettempdir()) / "movie-recap-gcs-cache"
-        cache_root.mkdir(parents=True, exist_ok=True)
-        cached = cache_root / f"{job_id}.mp4"
-        if not cached.is_file() or cached.stat().st_size == 0:
-            blob.download_to_filename(str(cached), timeout=900)
-        return cached if cached.is_file() and cached.stat().st_size else None
-    except Exception:
-        app.logger.exception("Could not fetch persisted final video %s from Cloud Storage", job_id)
-        return None
+    """Return the final MP4 from the app data directory only; no cloud storage."""
+    path = OUTPUT_ROOT / str(job_id) / "movie_recap.mp4"
+    return path if path.is_file() else None
 
 def _db_connect():
     connection = sqlite3.connect(str(JOB_DB, ), timeout=10)
@@ -131,7 +87,7 @@ HTML = r"""
 <html lang="my">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>One Click Movie Recap</title>
 <style>
 :root{color-scheme:dark;--page:#080d18;--page2:#0c1424;--text:#f4f7ff;--panel:#101a2c;--panel2:#142139;--border:#263650;--muted:#b8c5d9;--muted2:#8192ad;--field:#0a1323;--field-border:#344865;--button:#5d8cff;--button-text:#071226;--status:#0a1424;--accent:#70a5ff;--accent2:#83e2d0;--shadow:0 18px 50px #0003}
@@ -159,20 +115,6 @@ input[type=file]{padding:8px;min-height:48px;border-style:dashed;background:colo
 .preview{position:relative;overflow:hidden;touch-action:pan-y;border-radius:16px;background:#05070d;aspect-ratio:16/9;margin-top:12px;max-height:70vh;width:100%;border:1px solid #31435e;box-shadow:0 10px 30px #0003}
 .preview video{width:100%;height:100%;object-fit:contain;transition:filter .15s,transform .15s}
 .playback-controls{display:flex;align-items:center;gap:10px;margin-top:10px;padding:9px 11px;background:var(--panel2);border:1px solid var(--border);border-radius:12px}
-.capcut-editor{margin-top:16px;border:1px solid #27334a;border-radius:16px;overflow:hidden;background:#0a0e17;color:#edf2ff}
-.capcut-toolbar{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px;background:#121a29;border-bottom:1px solid #263249}
-.capcut-brand{font-size:13px;font-weight:900;letter-spacing:.3px}.capcut-badge{font-size:10px;color:#a8b8d4;background:#202c40;padding:5px 8px;border-radius:7px}
-.capcut-preview{padding:12px;background:#070a11}.timeline-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;font-size:11px;color:#9aaac4;border-top:1px solid #263249}
-.timeline-ruler{position:relative;height:25px;margin:0 12px;background:repeating-linear-gradient(90deg,#7384a0 0 1px,transparent 1px 10%);border-bottom:1px solid #34435b;color:#8292ad;font-size:9px}
-.timeline-ruler span{position:absolute;top:5px;transform:translateX(-50%)}
-.timeline-track{display:grid;grid-template-columns:70px minmax(0,1fr);gap:8px;align-items:center;padding:7px 12px}
-.track-label{font-size:10px;font-weight:800;color:#a8b8d4}.track-lane{position:relative;height:34px;overflow:hidden;border-radius:6px;background:#121b2b;border:1px solid #2b3a52}
-.track-clip{position:absolute;inset:2px auto 2px 2px;width:calc(100% - 4px);border-radius:4px;display:flex;align-items:center;gap:3px;padding:3px 6px;overflow:hidden;white-space:nowrap;font-size:10px;font-weight:800;background:linear-gradient(90deg,#246b78,#269b91);color:#f3ffff;border:1px solid #48b9b0}
-.track-clip.audio{background:linear-gradient(90deg,#3d367e,#6854bd);border-color:#9784ff}.track-clip.subs{background:linear-gradient(90deg,#8a5a23,#bd8433);border-color:#e3b65b}
-.timeline-playhead{position:absolute;top:-1px;bottom:-1px;width:2px;background:#ff526b;z-index:4;left:0;pointer-events:none}.timeline-playhead:before{content:"";position:absolute;top:-2px;left:-4px;width:10px;height:10px;border-radius:50%;background:#ff526b}
-.timeline-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px;padding:10px 12px 12px}.timeline-actions button{margin:0;min-height:37px;padding:8px;font-size:11px;background:#1a2639;border-color:#35465f;color:#edf2ff}
-.trim-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 12px 12px}.trim-grid label{font-size:10px;color:#a8b8d4;margin:0 0 5px}.trim-grid input{min-height:36px;padding:7px;background:#101827;border-color:#35465f;color:#edf2ff;font-size:12px}
-@media(max-width:420px){.timeline-track{grid-template-columns:55px minmax(0,1fr);padding-left:8px;padding-right:8px}.timeline-actions{padding-left:8px;padding-right:8px}.capcut-toolbar{padding:9px}}
 .playback-controls button{width:auto;min-width:84px;margin:0;padding:8px 12px;font-size:12px}.playback-controls input{flex:1;min-width:0;padding:0;min-height:18px}.playback-time{font-size:11px;color:var(--muted2);white-space:nowrap;font-variant-numeric:tabular-nums}
 .preview-overlay{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;display:block;padding:0;text-align:center;overflow:visible;z-index:4}
 .preview-subtitle{position:absolute;left:50%;top:88%;transform:translate(-50%,-50%);color:#fff;text-shadow:0 2px 4px #000,1px 1px 2px #000;font-weight:700;white-space:pre-wrap;max-width:94%;width:max-content;pointer-events:auto;touch-action:none;cursor:move;user-select:none;font-size:clamp(14px,3.2cqw,36px);line-height:1.15;overflow:visible}
@@ -186,7 +128,7 @@ button,.download{display:inline-flex;align-items:center;justify-content:center;g
 button:hover,.download:hover{filter:brightness(1.07);box-shadow:0 5px 18px color-mix(in srgb,var(--button) 20%,transparent)}button:active{transform:translateY(1px)}button:disabled{opacity:.55;cursor:wait;box-shadow:none}
 .key-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px}
 .status{padding:14px;border-radius:12px;background:var(--status);border:1px solid var(--border);white-space:pre-wrap;overflow-wrap:anywhere}
-.library-card{border:1px solid var(--border);border-radius:14px;padding:12px;margin-top:12px;background:var(--panel2)}.library-card h3{font-size:14px;margin:0 0 6px;overflow-wrap:anywhere}.library-meta{font-size:12px;color:var(--muted);margin-bottom:8px}.library-video{display:block;width:100%;max-height:360px;aspect-ratio:16/9;object-fit:contain;background:#05070d;border-radius:10px;margin:8px 0}.library-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}.library-actions .download{margin:0}.library-empty{padding:16px;border:1px dashed var(--border);border-radius:12px;color:var(--muted);font-size:13px}.batch-item{border:1px solid var(--border);border-radius:12px;padding:12px;margin-top:10px;background:var(--panel2)}.batch-item h3{font-size:13px;margin:0 0 7px;overflow-wrap:anywhere}.batch-state{font-size:12px;color:var(--muted);white-space:pre-wrap}.batch-item .download{margin-top:9px}.batch-progress{height:5px;background:var(--border);border-radius:9px;overflow:hidden;margin-top:8px}.batch-progress span{display:block;width:0;height:100%;background:var(--accent2);transition:width .2s}
+.library-card{border:1px solid var(--border);border-radius:14px;padding:12px;margin-top:12px;background:var(--panel2)}.library-card h3{font-size:14px;margin:0 0 6px;overflow-wrap:anywhere}.library-meta{font-size:12px;color:var(--muted);margin-bottom:8px}.library-video{display:block;width:100%;max-height:360px;aspect-ratio:16/9;object-fit:contain;background:#05070d;border-radius:10px;margin:8px 0}.library-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}.library-actions .download{margin:0}.library-empty{padding:16px;border:1px dashed var(--border);border-radius:12px;color:var(--muted);font-size:13px}
 .settings-wrap{position:fixed;z-index:20;inset:0;background:#020611b8;backdrop-filter:blur(8px);display:flex;justify-content:flex-end;align-items:stretch;padding:14px}
 .settings-card{width:min(420px,100%);max-height:100%;overflow:auto;background:var(--panel);border:1px solid var(--border);border-radius:20px;padding:22px;box-shadow:0 24px 80px #0007}
 .settings-head{display:flex;justify-content:space-between;align-items:center;gap:10px}.settings-head h2{margin:0}.close-btn{width:auto;margin:0;padding:7px 11px;background:var(--panel2);border-color:var(--border);color:var(--text);min-height:36px}
@@ -201,20 +143,47 @@ a{color:#9fbaff}
 @media(min-width:760px){main{padding-top:30px}.topbar{padding-bottom:22px}.panel{margin-top:20px}.wizard-step[data-step="0"]{max-width:760px}.wizard-step[data-step="1"]{max-width:760px}.wizard-step[data-step="3"]{max-width:760px}.preview{max-height:560px}}
 @media(max-width:600px){main{width:100%;padding:12px 12px 28px}.topbar{gap:8px;padding-bottom:15px}.topbar>div:first-child{gap:8px!important}.topbar h1{font-size:16px;letter-spacing:-.35px}.settings-btn{padding:8px 9px;font-size:11px;border-radius:9px}.panel{padding:15px 13px;border-radius:17px;margin:12px 0}.step-progress{margin-bottom:20px}.step-head{gap:10px;margin-bottom:18px}.step-number{min-width:34px;height:34px;border-radius:11px}.step-title{font-size:17px}.step-desc{font-size:11px}.option-grid{gap:10px}.wizard-nav{gap:8px}.wizard-nav button{padding:11px 8px;font-size:12px}.preview{border-radius:12px}.playback-controls{gap:7px;padding:7px}.playback-controls button{min-width:65px;padding:7px 8px}.playback-time{font-size:10px}.settings-wrap{padding:8px}.settings-card{padding:17px;border-radius:16px}.edit-tools{padding:10px}.edit-tools summary{font-size:13px}}
 @media(max-width:380px){.topbar h1{font-size:14px}.settings-btn{padding:7px;font-size:10px}.option-grid{grid-template-columns:1fr}.wizard-nav{flex-direction:column-reverse}.wizard-nav button{width:100%}.playback-time{display:none}}
+
+/* Live Edit responsive layouts: compact phones, standard phones, large phones, tablets and landscape. */
+.preview-device-hint{font-size:11px;color:var(--muted2);margin:7px 2px 0}
+main{padding-left:max(0px,env(safe-area-inset-left));padding-right:max(0px,env(safe-area-inset-right))}
+.preview{width:100%;max-width:100%;max-height:70vh;max-height:70dvh;overflow:hidden}
+.preview video{display:block;max-width:100%;max-height:100%;object-fit:contain}
+@media(max-width:360px){
+ main{padding:10px 9px calc(22px + env(safe-area-inset-bottom))}
+ .panel{padding:12px 10px;border-radius:14px}
+ .preview{border-radius:9px;max-height:58vh;max-height:58dvh}
+ .preview-subtitle{max-width:96%;font-size:clamp(12px,4cqw,24px)}
+ .preview-logo{max-width:34%;font-size:10px}
+ .playback-controls{gap:5px;padding:6px}
+ .playback-controls button{min-width:56px;padding:6px;font-size:11px}
+}
+@media(min-width:361px) and (max-width:430px){
+ .preview{max-height:64vh;max-height:64dvh}
+ .preview-subtitle{max-width:95%;font-size:clamp(13px,3.7cqw,29px)}
+ .preview-logo{max-width:38%}
+}
+@media(min-width:431px) and (max-width:600px){
+ main{padding-left:14px;padding-right:14px}
+ .preview{max-height:68vh;max-height:68dvh}
+ .preview-subtitle{font-size:clamp(14px,3.3cqw,32px)}
+}
+@media(orientation:landscape) and (max-height:500px){
+ main{padding-top:8px;padding-bottom:calc(12px + env(safe-area-inset-bottom))}
+ .preview{max-height:52vh;max-height:52dvh}
+ .preview-subtitle{font-size:clamp(12px,2.8cqw,24px)}
+ .settings-wrap{padding:5px}
+}
+@media(min-width:760px){
+ .preview{max-height:68vh;max-height:68dvh}
+ .preview-device-hint{font-size:12px}
+}
 </style>
 </head>
 <body><main>
 <div class="topbar"><div style="display:flex;align-items:center;gap:8px;min-width:0"><button class="settings-btn" id="newJobBtn" type="button">＋ New</button><h1>🎬 One Click Movie Recap</h1></div><div style="display:flex;gap:7px;align-items:center"><button class="settings-btn" id="themeToggle" type="button" aria-label="Toggle light and dark theme">☀️ Light</button><button class="settings-btn" id="openSettings" type="button">⚙️ Settings</button></div></div>
 <p class="muted">Video ထည့်ပါ → Recap MP4 ထုတ်ပါ</p>
 
-<section class="panel" id="batchPanel">
-  <div class="step-head"><span class="step-number">⚡</span><div><div class="step-title">Batch Recap — Multiple Movies</div><div class="step-desc">Movie များစွာကို တစ်ခါတည်းတင်ပြီး တစ်ကားချင်း Recap ထုတ်ပါ</div></div></div>
-  <p class="small">Video ဖိုင်များစွာကို ရွေးပါ။ App က တစ်ကားချင်းစီကို သီးခြား Job အဖြစ် အစဉ်လိုက်လုပ်ဆောင်ပြီး MP4 တစ်ခုစီ ထုတ်ပေးပါမယ်။ Auto Recap အတွက် Gemini နဲ့ Groq API Key လိုပါတယ်။ Batch mode မှာ movie တစ်ကားချင်းအလိုက် Script အသစ်ထုတ်မည်ဖြစ်သောကြောင့် custom script/WevoLabs voice upload ကို အသုံးမပြုပါ။</p>
-  <label for="batchFiles">Movie files (MP4 / MOV / WEBM / M4V) — တစ်ခါလျှင် အများဆုံး 5 ကား</label>
-  <input id="batchFiles" type="file" multiple accept=".mp4,.mov,.webm,.m4v,video/mp4,video/quicktime,video/webm">
-  <p class="muted small" id="batchSelection">Video မရွေးရသေးပါ။ တစ်ကားလျှင် 80 MB အောက်၊ 10 မိနစ်အောက် ဖြစ်ရပါမည်။</p>
-  <button id="batchStart" type="button">🎬 Generate Multiple Recaps</button>
-  <div id="batchResults" class="hidden" aria-live="polite" style="margin-top:14px"></div>
 </section>
 
 <section class="panel" id="savedLibrary">
@@ -255,17 +224,6 @@ a{color:#9fbaff}
 <div class="wizard-nav"><button type="button" class="back back-step" data-back="0">← Back</button><button type="button" class="next-step" data-next="2">Next → Edit Tools</button></div></section>
 <section class="wizard-step" data-step="2"><div class="step-head"><span class="step-number">3</span><div><div class="step-title">Edit Tools</div><div class="step-desc">မြန်မာစာတန်းထိုး၊ Logo၊ အလင်းနဲ့ Music ချိန်ပါ</div></div></div>
 <div class="preview-title">👁️ Live Edit Preview</div><div class="preview" id="preview"><video id="previewVideo" playsinline class="hidden"></video><div class="preview-logo" id="previewLogo"><img id="previewLogoImage" alt="Logo preview"><span id="previewLogoText">My Recap</span></div><div class="preview-text" id="previewText"></div><div class="blur-box" id="blurBox"><span class="resize-handle" id="blurResize" aria-label="Blur width"></span><span class="resize-handle blur-height-handle" id="blurHeightResize" aria-label="Blur height"></span></div><div class="preview-overlay"><div class="preview-subtitle" id="previewSubtitle">မြန်မာစာတန်းထိုး အစမ်းမြင်ကွင်း<span class="resize-handle" id="subtitleResize" aria-label="Resize subtitle"></span></div></div></div><div class="playback-controls"><button id="previewPlay" type="button">▶ Play</button><input id="previewSeek" type="range" min="0" max="1000" value="0" aria-label="Video seek"><span class="playback-time" id="previewTime">0:00 / 0:00</span></div>
-<div class="capcut-editor" id="capcutEditor">
- <div class="capcut-toolbar"><span class="capcut-brand">✂ CAPCUT-STYLE TIMELINE</span><span class="capcut-badge">LIVE EDIT</span></div>
- <div class="capcut-preview"><div class="preview-title" style="color:#eaf0ff;margin:0">Timeline Editor · Scrub the video above</div></div>
- <div class="timeline-head"><strong>Timeline</strong><span id="timelineTime">00:00 / 00:00</span></div>
- <div class="timeline-ruler" id="timelineRuler"><span style="left:0%">00:00</span><span style="left:25%">25%</span><span style="left:50%">50%</span><span style="left:75%">75%</span><span style="left:100%">End</span><div class="timeline-playhead" id="timelinePlayhead"></div></div>
- <div class="timeline-track"><span class="track-label">VIDEO</span><div class="track-lane"><div class="track-clip" id="videoTimelineClip">🎞 VIDEO CLIP</div></div></div>
- <div class="timeline-track"><span class="track-label">AI VOICE</span><div class="track-lane"><div class="track-clip audio" id="audioTimelineClip">♫ WevoLabs / AI VOICE</div></div></div>
- <div class="timeline-track"><span class="track-label">SUBTITLE</span><div class="track-lane"><div class="track-clip subs" id="subtitleTimelineClip">Aa မြန်မာစာတန်းထိုး</div></div></div>
- <div class="timeline-actions"><button type="button" id="timelineSplit">✂ Split at Playhead</button><button type="button" id="timelineReset">↺ Reset Trim</button></div>
- <div class="trim-grid"><div><label for="trimStart">Trim start (seconds)</label><input type="number" id="trimStart" min="0" step="0.1" value="0"></div><div><label for="trimEnd">Trim end (seconds)</label><input type="number" id="trimEnd" min="0" step="0.1" placeholder="Video end"></div></div>
- <p class="muted small" id="timelineNote" style="padding:0 12px 12px;margin:0;color:#a8b8d4">Trim Start/End ကို Final MP4 ထုတ်ရာတွင် တကယ်အသုံးပြုပါမည်။</p>
 </div>
 <p class="muted preview-hint" id="previewHint">Upload Video ရွေးပါ။ အောက်က Edit Tools ပြောင်းတာနဲ့ ဒီမှာပြောင်းလဲမှုကို ကြည့်နိုင်ပါတယ်။</p>
 <details class="edit-tools"><summary class="edit-summary">🎨 Edit Tools — ချိန်ညှိရန် နှိပ်ပါ</summary><div class="edit-adjustments"><div><label><input id="autoEffect" type="checkbox" checked style="width:auto;margin-right:5px"> ✨ Auto Effect</label></div><div class="option-grid"><div><label for="blur">Blur Box Strength (px) <span id="blurValue">0</span></label><input id="blur" type="range" min="0" max="70" value="0"><input id="blurX" type="hidden" value="50"><input id="blurY" type="hidden" value="84"><input id="blurW" type="hidden" value="55"><input id="blurH" type="hidden" value="12"><p class="muted small">Blur Box ကို video ပေါ်မှာ လက်နဲ့ရွှေ့/အရွယ်ပြောင်းနိုင်သည်။</p></div><div><label><input id="subtitlesOn" type="checkbox" checked style="width:auto;margin-right:5px"> 📝 Subtitles On / Off</label><label for="subSize">စာတန်းအရွယ်အစား</label><input id="subSize" type="range" min="20" max="64" value="40"></div><div><label for="subColor">စာတန်းအရောင်</label><select id="subColor"><option value="&H00FFFFFF">White</option><option value="&H0000FFFF">Yellow</option><option value="&H0000FF00">Green</option><option value="&H00FF8080">Light Blue</option></select></div><div><label for="subPosition">စာတန်းနေရာ</label><select id="subPosition"><option value="bottom">အောက်</option><option value="middle">အလယ်</option><option value="top">အပေါ်</option></select></div><div><label for="subX">စာတန်း X <span id="subXValue">50%</span></label><input id="subX" type="range" min="5" max="95" value="50"></div><div><label for="subY">စာတန်း Y <span id="subYValue">88%</span></label><input id="subY" type="range" min="5" max="95" value="88"></div><div><label for="subWeight">စာတန်းအထူ</label><select id="subWeight"><option value="bold">Bold</option><option value="normal">Normal</option></select></div><div><label for="subOutline">စာတန်းအနားသတ် <span id="subOutlineValue">2</span></label><input id="subOutline" type="range" min="0" max="6" value="2"></div></div>
@@ -282,7 +240,7 @@ const form=document.getElementById('jobform'),btn=document.getElementById('submi
 document.getElementById('newJobBtn').addEventListener('click',()=>{if(btn.disabled&&!confirm('လက်ရှိလုပ်ဆောင်နေသော Job ကို စောင့်မနေဘဲ စာမျက်နှာအသစ်ဖွင့်မလား။'))return;window.location.reload();});
 const geminiInput=document.getElementById('geminiKey'),groqInput=document.getElementById('groqKey'),keyStatus=document.getElementById('keyStatus');
 const settingsWrap=document.getElementById('settingsWrap');const themeToggle=document.getElementById('themeToggle');function applyTheme(theme){document.body.classList.toggle('light',theme==='light');themeToggle.textContent=theme==='light'?'🌙 Dark':'☀️ Light';try{localStorage.setItem('oneclick_theme',theme);}catch(e){}}let savedTheme='dark';try{savedTheme=localStorage.getItem('oneclick_theme')||'dark';}catch(e){}applyTheme(savedTheme);themeToggle.addEventListener('click',()=>applyTheme(document.body.classList.contains('light')?'dark':'light'));document.getElementById('openSettings').addEventListener('click',()=>settingsWrap.classList.remove('hidden'));function bindKeyToggle(buttonId,input){const toggle=document.getElementById(buttonId);toggle.addEventListener('click',()=>{const showing=input.type==='text';input.type=showing?'password':'text';toggle.textContent=showing?'ကြည့်ရန်':'ဖျောက်ရန်';toggle.setAttribute('aria-label',(showing?'Show':'Hide')+' API key');});}bindKeyToggle('toggleGeminiKey',geminiInput);bindKeyToggle('toggleGroqKey',groqInput);document.getElementById('closeSettings').addEventListener('click',()=>settingsWrap.classList.add('hidden'));settingsWrap.addEventListener('click',e=>{if(e.target===settingsWrap)settingsWrap.classList.add('hidden');});
-const previewVideo=document.getElementById('previewVideo'),previewLogo=document.getElementById('previewLogo'),previewText=document.getElementById('previewText'),previewSubtitle=document.getElementById('previewSubtitle');const previewPlay=document.getElementById('previewPlay'),previewSeek=document.getElementById('previewSeek'),previewTime=document.getElementById('previewTime');function timeLabel(s){if(!Number.isFinite(s))s=0;return Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0')}function syncPlayback(){const d=previewVideo.duration||0;previewSeek.value=d?Math.round(previewVideo.currentTime/d*1000):0;previewTime.textContent=timeLabel(previewVideo.currentTime)+' / '+timeLabel(d);previewPlay.textContent=previewVideo.paused?'▶ Play':'❚❚ Pause';const ph=document.getElementById('timelinePlayhead');if(ph)ph.style.left=(d?Math.max(0,Math.min(100,previewVideo.currentTime/d*100)):0)+'%';const tt=document.getElementById('timelineTime');if(tt)tt.textContent=timeLabel(previewVideo.currentTime)+' / '+timeLabel(d);const end=document.getElementById('trimEnd');if(end&&d){end.max=d.toFixed(1);if(!end.value)end.placeholder=d.toFixed(1)}const clip=document.getElementById('videoTimelineClip');if(clip&&d){const s=Math.max(0,Math.min(d,+document.getElementById('trimStart').value||0)),e=Math.max(s,Math.min(d,+end.value||d));clip.style.left=(s/d*100)+'%';clip.style.width=Math.max(1,(e-s)/d*100)+'%';document.getElementById('audioTimelineClip').style.width=Math.max(1,(e-s)/d*100)+'%';document.getElementById('subtitleTimelineClip').style.width=Math.max(1,(e-s)/d*100)+'%';}}previewPlay.addEventListener('click',()=>{if(previewVideo.paused)previewVideo.play().catch(()=>{});else previewVideo.pause();syncPlayback()});previewSeek.addEventListener('input',()=>{if(previewVideo.duration)previewVideo.currentTime=(+previewSeek.value/1000)*previewVideo.duration});['timeupdate','durationchange','play','pause','ended'].forEach(ev=>previewVideo.addEventListener(ev,syncPlayback));
+const previewVideo=document.getElementById('previewVideo'),previewLogo=document.getElementById('previewLogo'),previewText=document.getElementById('previewText'),previewSubtitle=document.getElementById('previewSubtitle');const previewPlay=document.getElementById('previewPlay'),previewSeek=document.getElementById('previewSeek'),previewTime=document.getElementById('previewTime');function timeLabel(s){if(!Number.isFinite(s))s=0;return Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0')}function syncPlayback(){const d=previewVideo.duration||0;previewSeek.value=d?Math.round(previewVideo.currentTime/d*1000):0;previewTime.textContent=timeLabel(previewVideo.currentTime)+' / '+timeLabel(d);previewPlay.textContent=previewVideo.paused?'▶ Play':'❚❚ Pause';}previewPlay.addEventListener('click',()=>{if(previewVideo.paused)previewVideo.play().catch(()=>{});else previewVideo.pause();syncPlayback()});previewSeek.addEventListener('input',()=>{if(previewVideo.duration)previewVideo.currentTime=(+previewSeek.value/1000)*previewVideo.duration});['timeupdate','durationchange','play','pause','ended'].forEach(ev=>previewVideo.addEventListener(ev,syncPlayback));
 function updatePreview(){const blur=+document.getElementById('blur').value,size=+document.getElementById('subSize').value,frameHeight=previewVideo.videoHeight||720;['blur','brightness','contrast','saturation','subX','subY','subOutline','logoX','logoY','logoOpacity','logoW'].forEach(id=>{const el=document.getElementById(id),out=document.getElementById(id+'Value');if(out)out.textContent=el.value+(id==='subOutline'?'':'%')});const autoEffect=document.getElementById('autoEffect').checked;previewVideo.style.filter=autoEffect?'contrast(1.04) saturate(1.06)':'';const bb=document.getElementById('blurBox');bb.style.display=blur?'block':'none';const frameScaleForBlur=Math.min((previewVideo.clientWidth||800)/(previewVideo.videoWidth||1280),(previewVideo.clientHeight||450)/(previewVideo.videoHeight||720));bb.style.left=document.getElementById('blurX').value+'%';bb.style.top=document.getElementById('blurY').value+'%';bb.style.width=document.getElementById('blurW').value+'%';bb.style.height=document.getElementById('blurH').value+'%';bb.style.backdropFilter='blur('+(blur*frameScaleForBlur)+'px)';previewVideo.style.transform=document.getElementById('mirror').checked?'scaleX(-1)':'';document.getElementById('previewLogoText').textContent=document.getElementById('logoText').value;previewLogo.style.left=document.getElementById('logoX').value+'%';previewLogo.style.top=document.getElementById('logoY').value+'%';const frameWidth=previewVideo.videoWidth||1280,boxWidth=previewVideo.clientWidth||800,boxHeight=previewVideo.clientHeight||450;const frameScale=Math.min(boxWidth/frameWidth,boxHeight/(previewVideo.videoHeight||720));const logoImg=document.getElementById('previewLogoImage'),hasLogoImage=!!logoImg.getAttribute('src');if(hasLogoImage){const naturalW=logoImg.naturalWidth||300,naturalH=logoImg.naturalHeight||150;const autoW=Math.max(24,(+document.getElementById('logoW').value/100)*frameWidth*frameScale);const autoH=autoW*naturalH/naturalW;previewLogo.style.width=autoW+'px';previewLogo.style.height=autoH+'px';previewLogo.style.minWidth='0';previewLogo.style.minHeight='0';previewLogo.style.maxWidth='none';previewLogo.style.maxHeight='none';previewLogo.style.aspectRatio='auto';previewLogo.style.padding='0';previewLogo.style.background='transparent';logoImg.style.width='100%';logoImg.style.height='100%';logoImg.style.maxWidth='none';logoImg.style.maxHeight='none';logoImg.style.objectFit='contain';previewLogo.style.fontSize='12px';}else{previewLogo.style.aspectRatio='auto';previewLogo.style.padding='3px 6px';previewLogo.style.background='#0008';logoImg.style.width='auto';logoImg.style.height='auto';previewLogo.style.width='max-content';previewLogo.style.height='max-content';previewLogo.style.fontSize=(Math.max(12,Math.round(frameHeight*0.18*0.12))*frameScale)+'px';}previewLogo.style.opacity=+document.getElementById('logoOpacity').value/100;previewLogo.style.display=(document.getElementById('logoText').value||hasLogoImage)?'flex':'none';previewText.textContent=document.getElementById('overlayText').value;previewText.style.left='50%';previewText.style.top=(12/(previewVideo.videoHeight||720)*100)+'%';previewText.style.transform='translateX(-50%)';previewText.style.fontSize=(22*frameScale)+'px';previewText.style.color='#fff';previewText.style.textShadow='-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000,1px 1px 0 #000';const previewHeight=previewVideo.clientHeight||450;previewSubtitle.style.fontSize=Math.max(12,Math.min(36,size*(previewVideo.videoHeight?Math.min((previewVideo.clientWidth||800)/(previewVideo.videoWidth||1280),(previewVideo.clientHeight||450)/frameHeight):1)))+'px';previewSubtitle.style.fontWeight=document.getElementById('subWeight').value;previewSubtitle.style.left=document.getElementById('subX').value+'%';previewSubtitle.style.top=document.getElementById('subY').value+'%';previewSubtitle.style.textShadow='0 0 '+(+document.getElementById('subOutline').value*2)+'px #000,1px 1px '+document.getElementById('subOutline').value+'px #000';previewSubtitle.style.color=({'&H00FFFFFF':'#fff','&H0000FFFF':'#ffff00','&H0000FF00':'#00ff00','&H00FF8080':'#8080ff'})[document.getElementById('subColor').value]||'#fff';previewSubtitle.style.top=document.getElementById('subY').value+'%';}
 document.getElementById('subPosition').addEventListener('change',()=>{const p=document.getElementById('subPosition').value;document.getElementById('subY').value=p==='top'?20:(p==='middle'?50:88);updatePreview();});
 ['blur','subSize','subColor','subPosition','subX','subY','subWeight','subOutline','mirror','logoText','logoX','logoY','logoOpacity','overlayText','autoEffect','blurX','blurY','blurW','blurH'].forEach(id=>{const el=document.getElementById(id);if(el)el.addEventListener('input',updatePreview);});
@@ -330,8 +288,8 @@ bindDrag(previewLogo,'logoX','logoY',null,null,0,0);bindDrag(previewSubtitle,'su
 
 // Removed music controls; no listener needed.
 let currentStep=0;function showStep(n){currentStep=Math.max(0,Math.min(3,n));document.querySelectorAll('.wizard-step').forEach(el=>el.classList.toggle('active',Number(el.dataset.step)===currentStep));document.querySelectorAll('.step-progress span').forEach((el,i)=>el.classList.toggle('on',i<=currentStep));window.scrollTo(0,0);}document.querySelectorAll('.next-step').forEach(el=>el.addEventListener('click',()=>{if(currentStep===0){const url=document.getElementById('url').value.trim(),file=document.getElementById('videoFile').files[0];if((!url&&!file)||(url&&file)){alert('Video URL သို့မဟုတ် Upload Video တစ်ခုကို ရွေးပါ။');return;}}showStep(Number(el.dataset.next));}));document.querySelectorAll('.back-step').forEach(el=>el.addEventListener('click',()=>showStep(Number(el.dataset.back))));
-previewVideo.addEventListener('loadedmetadata',()=>{if(previewVideo.videoWidth>0&&previewVideo.videoHeight>0){const preview=document.getElementById('preview'),ratio=previewVideo.videoWidth/previewVideo.videoHeight;preview.style.aspectRatio=previewVideo.videoWidth+'/'+previewVideo.videoHeight;preview.style.width='min(100%, calc(70vh * '+ratio+'))';preview.style.maxHeight='none';updatePreview();}});function loadPreviewSource(){const preview=document.getElementById('preview');preview.style.aspectRatio='16/9';preview.style.width='100%';preview.style.maxHeight='70vh';const file=document.getElementById('videoFile').files[0],url=document.getElementById('url').value.trim();if(previewVideo.dataset.objectUrl){URL.revokeObjectURL(previewVideo.dataset.objectUrl);previewVideo.dataset.objectUrl='';}previewVideo.pause();previewVideo.removeAttribute('src');if(file){previewVideo.dataset.objectUrl=URL.createObjectURL(file);previewVideo.src=previewVideo.dataset.objectUrl;previewVideo.classList.remove('hidden');previewPlay.classList.remove('hidden');previewSeek.classList.remove('hidden');previewVideo.load();document.getElementById('previewHint').textContent='Upload Video ကို တိုက်ရိုက်ပြထားပါတယ်။ မြန်မာစာတန်းထိုး အစမ်းမြင်ကွင်း ကို ဖုန်းမျက်နှာပြင်နဲ့ကိုက်ညီအောင် ချိန်ထားပါတယ်။ Subtitle/Logo ကို ဖိဆွဲရွှေ့နိုင်ပါတယ်။';}else if(url&&/\.(mp4|webm|mov|m4v)(\?|#|$)/i.test(url)){previewVideo.src=url;previewVideo.classList.remove('hidden');previewPlay.classList.remove('hidden');previewSeek.classList.remove('hidden');previewVideo.load();document.getElementById('previewHint').textContent='URL Preview — direct video link ဖြစ်ရပါမယ်။ YouTube/TikTok webpage link များကို browser preview မှာ တိုက်ရိုက်မဖွင့်နိုင်နိုင်ပါ။';}else{previewVideo.classList.add('hidden');previewPlay.classList.add('hidden');previewSeek.classList.add('hidden');document.getElementById('previewHint').textContent='Upload Video ရွေးပါ သို့မဟုတ် တိုက်ရိုက် MP4 URL ထည့်ပါ။';}syncPlayback();updatePreview();}document.getElementById('videoFile').addEventListener('change',loadPreviewSource);document.getElementById('url').addEventListener('change',loadPreviewSource);document.getElementById('url').addEventListener('input',()=>{if(!document.getElementById('videoFile').files[0]){clearTimeout(window.previewUrlTimer);window.previewUrlTimer=setTimeout(loadPreviewSource,700);}});
-document.getElementById('timelineSplit').addEventListener('click',()=>{const t=previewVideo.currentTime||0;document.getElementById('trimStart').value=t.toFixed(1);document.getElementById('timelineNote').textContent='Split marker set at '+t.toFixed(1)+'s. Final export starts here.';syncPlayback();});document.getElementById('timelineReset').addEventListener('click',()=>{document.getElementById('trimStart').value='0';document.getElementById('trimEnd').value='';document.getElementById('timelineNote').textContent='Trim reset. Entire video will be used.';syncPlayback();});['trimStart','trimEnd'].forEach(id=>document.getElementById(id).addEventListener('input',syncPlayback));document.getElementById('timelineRuler').addEventListener('pointerdown',e=>{if(!previewVideo.duration)return;const r=e.currentTarget.getBoundingClientRect();previewVideo.currentTime=Math.max(0,Math.min(1,(e.clientX-r.left)/r.width))*previewVideo.duration;syncPlayback();});document.getElementById('subtitlesOn').addEventListener('change',()=>{document.getElementById('previewSubtitle').style.display=document.getElementById('subtitlesOn').checked?'':'none';});document.getElementById('language').addEventListener('change',()=>{const v=document.getElementById('voice');if(document.getElementById('language').value==='my'){if(!v.value.startsWith('my-MM-'))v.value='my-MM-NilarNeural';}else if(v.value.startsWith('my-MM-'))v.value='en-US-AriaNeural';});updatePreview();
+previewVideo.addEventListener('loadedmetadata',()=>{if(previewVideo.videoWidth>0&&previewVideo.videoHeight>0){const preview=document.getElementById('preview'),ratio=previewVideo.videoWidth/previewVideo.videoHeight;preview.style.aspectRatio=previewVideo.videoWidth+'/'+previewVideo.videoHeight;preview.style.width='min(100%, calc(64dvh * '+ratio+'))';preview.style.maxHeight='64dvh';updatePreview();}});function loadPreviewSource(){const preview=document.getElementById('preview');preview.style.aspectRatio='16/9';preview.style.width='100%';preview.style.maxHeight='64dvh';const file=document.getElementById('videoFile').files[0],url=document.getElementById('url').value.trim();if(previewVideo.dataset.objectUrl){URL.revokeObjectURL(previewVideo.dataset.objectUrl);previewVideo.dataset.objectUrl='';}previewVideo.pause();previewVideo.removeAttribute('src');if(file){previewVideo.dataset.objectUrl=URL.createObjectURL(file);previewVideo.src=previewVideo.dataset.objectUrl;previewVideo.classList.remove('hidden');previewPlay.classList.remove('hidden');previewSeek.classList.remove('hidden');previewVideo.load();document.getElementById('previewHint').textContent='Upload Video ကို တိုက်ရိုက်ပြထားပါတယ်။ မြန်မာစာတန်းထိုး အစမ်းမြင်ကွင်း ကို ဖုန်းမျက်နှာပြင်နဲ့ကိုက်ညီအောင် ချိန်ထားပါတယ်။ Subtitle/Logo ကို ဖိဆွဲရွှေ့နိုင်ပါတယ်။';}else if(url&&/\.(mp4|webm|mov|m4v)(\?|#|$)/i.test(url)){previewVideo.src=url;previewVideo.classList.remove('hidden');previewPlay.classList.remove('hidden');previewSeek.classList.remove('hidden');previewVideo.load();document.getElementById('previewHint').textContent='URL Preview — direct video link ဖြစ်ရပါမယ်။ YouTube/TikTok webpage link များကို browser preview မှာ တိုက်ရိုက်မဖွင့်နိုင်နိုင်ပါ။';}else{previewVideo.classList.add('hidden');previewPlay.classList.add('hidden');previewSeek.classList.add('hidden');document.getElementById('previewHint').textContent='Upload Video ရွေးပါ သို့မဟုတ် တိုက်ရိုက် MP4 URL ထည့်ပါ။';}syncPlayback();updatePreview();}document.getElementById('videoFile').addEventListener('change',loadPreviewSource);document.getElementById('url').addEventListener('change',loadPreviewSource);document.getElementById('url').addEventListener('input',()=>{if(!document.getElementById('videoFile').files[0]){clearTimeout(window.previewUrlTimer);window.previewUrlTimer=setTimeout(loadPreviewSource,700);}});
+document.getElementById('subtitlesOn').addEventListener('change',()=>{document.getElementById('previewSubtitle').style.display=document.getElementById('subtitlesOn').checked?'':'none';});document.getElementById('language').addEventListener('change',()=>{const v=document.getElementById('voice');if(document.getElementById('language').value==='my'){if(!v.value.startsWith('my-MM-'))v.value='my-MM-NilarNeural';}else if(v.value.startsWith('my-MM-'))v.value='en-US-AriaNeural';});updatePreview();
 function loadSavedKeys(){try{geminiInput.value=localStorage.getItem('oneclick_gemini_key')||'';groqInput.value=localStorage.getItem('oneclick_groq_key')||'';keyStatus.textContent=(geminiInput.value&&groqInput.value)?'ဒီ Browser ထဲမှာ Key နှစ်ခုလုံး သိမ်းထားသည်။':'Key မသိမ်းရသေးပါ။';}catch(e){keyStatus.textContent='ဒီ Browser မှာ local storage အသုံးပြုမရပါ။';}}
 document.getElementById('saveKeys').addEventListener('click',()=>{const g=geminiInput.value.trim(),q=groqInput.value.trim();if(!g||!q){keyStatus.textContent='Gemini နဲ့ Groq Key နှစ်ခုလုံး ထည့်ပါ။';return;}try{localStorage.setItem('oneclick_gemini_key',g);localStorage.setItem('oneclick_groq_key',q);keyStatus.textContent='Key နှစ်ခုလုံးကို ဒီ Browser ထဲမှာ Save လုပ်ပြီးပါပြီ။';}catch(e){keyStatus.textContent='Save မလုပ်နိုင်ပါ။ Browser storage setting ကို စစ်ပါ။';}});
 document.getElementById('clearKeys').addEventListener('click',()=>{try{localStorage.removeItem('oneclick_gemini_key');localStorage.removeItem('oneclick_groq_key');}catch(e){}geminiInput.value='';groqInput.value='';keyStatus.textContent='Browser ထဲက Saved Keys ကို ဖျက်ပြီးပါပြီ။';});
@@ -339,20 +297,14 @@ loadSavedKeys();
 const libraryItems=document.getElementById('libraryItems'),libraryCount=document.getElementById('libraryCount');
 async function loadVideoLibrary(){libraryCount.textContent='Library ကို စစ်ဆေးနေသည်…';try{const response=await fetch('/api/library',{cache:'no-store'});const data=await response.json();if(!response.ok)throw new Error(data.error||'Library မရပါ');libraryItems.replaceChildren();libraryCount.textContent='စုစုပေါင်း '+data.count+' ခု'+(data.persistent_storage_configured?' · Persistent Disk သတ်မှတ်ပြီး':' · သတိ: Persistent Disk မသတ်မှတ်ရသေးပါ');if(!data.persistent_storage_configured){const warning=document.createElement('div');warning.className='library-empty';warning.style.marginTop='10px';warning.textContent='Render Disk ကို /var/data တွင် mount လုပ်ပြီး Environment Variable MOVIE_RECAP_DATA_DIR=/var/data သတ်မှတ်ပါ။ မသတ်မှတ်လျှင် restart/redeploy အပြီး ဖိုင်များ ပျောက်နိုင်သည်။';libraryItems.appendChild(warning);}if(!data.videos.length){const empty=document.createElement('div');empty.className='library-empty';empty.textContent='Final MP4 မရှိသေးပါ။ Recap ပြီးသွားလျှင် ဒီနေရာတွင် ပြန်တွေ့နိုင်ပါမည်။';libraryItems.appendChild(empty);return;}for(const video of data.videos){const card=document.createElement('article');card.className='library-card';const title=document.createElement('h3');title.textContent=video.title||'Movie Recap';const meta=document.createElement('div');meta.className='library-meta';const date=new Date(Number(video.created||0)*1000);const size=(Number(video.size_bytes||0)/1024/1024).toFixed(1);meta.textContent=(Number.isNaN(date.getTime())?'':date.toLocaleString())+' · '+size+' MB';const player=document.createElement('video');player.className='library-video';player.controls=true;player.playsInline=true;player.preload='metadata';player.src=video.preview_url;const actions=document.createElement('div');actions.className='library-actions';const download=document.createElement('a');download.className='download';download.href=video.download_url;download.textContent='⬇️ Final MP4 Download';const open=document.createElement('a');open.className='download';open.href=video.preview_url;open.target='_blank';open.rel='noopener';open.textContent='▶ Open Video';actions.append(download,open);card.append(title,meta,player,actions);libraryItems.appendChild(card);}}catch(error){libraryCount.textContent='Library ကို မဖတ်နိုင်ပါ';libraryItems.replaceChildren();const message=document.createElement('div');message.className='library-empty';message.textContent=error.message+' — Disk mount နဲ့ MOVIE_RECAP_DATA_DIR ကို စစ်ပါ။';libraryItems.appendChild(message);}}
 document.getElementById('refreshLibrary').addEventListener('click',loadVideoLibrary);
-const batchFilesInput=document.getElementById('batchFiles'),batchStart=document.getElementById('batchStart'),batchResults=document.getElementById('batchResults'),batchSelection=document.getElementById('batchSelection');
-batchFilesInput.addEventListener('change',()=>{const files=Array.from(batchFilesInput.files||[]);batchSelection.textContent=files.length?files.length+' movie(s) selected · '+files.map(f=>f.name).join(', '):'Video မရွေးရသေးပါ။ တစ်ကားလျှင် 80 MB အောက်၊ 10 မိနစ်အောက် ဖြစ်ရပါမည်။';});
-function batchOptions(){return {voice:document.getElementById('voice').value,subtitle_pace:document.getElementById('subtitlePace').value,auto_effect:document.getElementById('autoEffect').checked,blur:document.getElementById('blur').value,blur_x:document.getElementById('blurX').value,blur_y:document.getElementById('blurY').value,blur_w:document.getElementById('blurW').value,blur_h:document.getElementById('blurH').value,mirror:document.getElementById('mirror').checked,sub_size:document.getElementById('subSize').value,sub_color:document.getElementById('subColor').value,sub_position:document.getElementById('subPosition').value,sub_x:document.getElementById('subX').value,sub_y:document.getElementById('subY').value,sub_weight:document.getElementById('subWeight').value,sub_outline:document.getElementById('subOutline').value,logo_text:document.getElementById('logoText').value,logo_x:document.getElementById('logoX').value,logo_y:document.getElementById('logoY').value,logo_w:document.getElementById('logoW').value,logo_opacity:document.getElementById('logoOpacity').value,overlay_text:document.getElementById('overlayText').value,subtitles_on:document.getElementById('subtitlesOn').checked};}
-function makeBatchCard(file,index){const card=document.createElement('div');card.className='batch-item';const title=document.createElement('h3');title.textContent=(index+1)+'. '+file.name;const state=document.createElement('div');state.className='batch-state';state.textContent='စောင့်ဆိုင်းနေသည်…';const progress=document.createElement('div');progress.className='batch-progress';const fill=document.createElement('span');progress.appendChild(fill);const result=document.createElement('div');card.append(title,state,progress,result);batchResults.appendChild(card);return {card,state,fill,result};}
-function wait(ms){return new Promise(resolve=>setTimeout(resolve,ms));}
-async function waitForBatchJob(id,card){for(let tries=0;tries<1200;tries++){const response=await fetch('/api/jobs/'+id);const data=await response.json();if(!response.ok)throw new Error(data.error||'Job status မရပါ');card.state.textContent=data.message||data.status;card.fill.style.width=data.status==='done'?'100%':data.status==='error'?'100%':'65%';if(data.status==='done')return data;if(data.status==='error')throw new Error(data.message||'ဒီ video မအောင်မြင်ပါ');await wait(3000);}throw new Error('အချိန်ကြာလွန်းနေသည်။ Job status ကို ပြန်စစ်ပါ။');}
-batchStart.addEventListener('click',async()=>{const files=Array.from(batchFilesInput.files||[]);if(!files.length){alert('Movie Video အနည်းဆုံးတစ်ခု ရွေးပါ။');return;}if(files.length>5){alert('တစ်ခါလျှင် အများဆုံး 5 ကားသာ ရွေးပါ။');return;}const g=geminiInput.value.trim(),q=groqInput.value.trim();if(!g||!q){settingsWrap.classList.remove('hidden');keyStatus.textContent='Batch Recap အတွက် Gemini နဲ့ Groq API Key နှစ်ခုလုံး လိုပါတယ်။';return;}const allowed=/\.(mp4|mov|webm|m4v)$/i;for(const file of files){if(!allowed.test(file.name)){alert('MP4, MOV, WEBM, M4V ဖိုင်များကိုသာ သုံးပါ: '+file.name);return;}if(file.size>80*1024*1024){alert('80 MB ထက်ကြီးနေသောဖိုင်: '+file.name);return;}if(file.size===0){alert('ဖိုင်အလွတ်ဖြစ်နေသည်: '+file.name);return;}}batchStart.disabled=true;batchFilesInput.disabled=true;batchResults.classList.remove('hidden');batchResults.replaceChildren();const cards=files.map(makeBatchCard);let completed=0,failed=0;for(let i=0;i<files.length;i++){const file=files[i],card=cards[i];card.state.textContent='Upload & Queue…';try{const body=new FormData();body.append('url','');body.append('video',file);body.append('language',document.getElementById('language').value);body.append('gemini_api_key',g);body.append('groq_api_key',q);Object.entries(batchOptions()).forEach(([k,v])=>body.append(k,String(v)));const logo=document.getElementById('logoImage').files[0];if(logo)body.append('logo_image',logo);const response=await fetch('/api/jobs',{method:'POST',body});const created=await response.json();if(!response.ok)throw new Error(created.error||'Job စတင်မရပါ');card.state.textContent='Queued…';const done=await waitForBatchJob(created.id,card);const video=document.createElement('video');video.controls=true;video.playsInline=true;video.preload='metadata';video.src='/api/jobs/'+created.id+'/preview';video.style.cssText='display:block;width:100%;max-height:320px;margin-top:10px;background:#05070d;border-radius:9px';const link=document.createElement('a');link.className='download';link.href='/api/jobs/'+created.id+'/download';link.textContent='⬇️ '+file.name.replace(/\.[^.]+$/,'')+' — Final MP4';link.download='';card.result.append(video,link);card.state.textContent='ပြီးပါပြီ ✓';completed++;}catch(err){card.state.textContent='မအောင်မြင်ပါ: '+err.message;card.fill.style.width='100%';card.fill.style.background='#e06a78';failed++;} }const summary=document.createElement('p');summary.className='small';summary.textContent='Batch ပြီးပါပြီ — '+completed+' အောင်မြင်၊ '+failed+' မအောင်မြင်။';batchResults.prepend(summary);batchStart.disabled=false;batchFilesInput.disabled=false;loadVideoLibrary();});
 form.addEventListener('submit',async(e)=>{e.preventDefault();const geminiKey=geminiInput.value.trim(),groqKey=groqInput.value.trim(),videoFile=document.getElementById('videoFile').files[0],videoUrl=document.getElementById('url').value.trim();const recapScript=document.getElementById('recapScript').value.trim();if(!recapScript&&(!geminiKey||!groqKey)){result.classList.remove('hidden');statusBox.textContent='Auto Recap အတွက် API Key Settings မှာ Gemini နဲ့ Groq Key နှစ်ခုလုံးထည့်ပြီး Save Keys ကိုနှိပ်ပါ။ WevoLabs အသံနဲ့ ကိုယ်ပိုင် Script သုံးလျှင် Key မလိုပါ။';return;}if((!videoUrl&&!videoFile)||(videoUrl&&videoFile)){result.classList.remove('hidden');statusBox.textContent='Video URL သို့မဟုတ် Upload Video တစ်ခုကိုပဲ ရွေးပါ။';return;}btn.disabled=true;result.classList.remove('hidden');links.innerHTML='';statusBox.textContent='အလုပ်စတင်နေသည်…';
-try{const body=new FormData();const options={trim_start:document.getElementById("trimStart").value,trim_end:document.getElementById("trimEnd").value,voice:document.getElementById('voice').value,subtitle_pace:document.getElementById('subtitlePace').value,auto_effect:document.getElementById('autoEffect').checked,blur:document.getElementById('blur').value,blur_x:document.getElementById('blurX').value,blur_y:document.getElementById('blurY').value,blur_w:document.getElementById('blurW').value,blur_h:document.getElementById('blurH').value,mirror:document.getElementById('mirror').checked,sub_size:document.getElementById('subSize').value,sub_color:document.getElementById('subColor').value,sub_position:document.getElementById('subPosition').value,sub_x:document.getElementById('subX').value,sub_y:document.getElementById('subY').value,sub_weight:document.getElementById('subWeight').value,sub_outline:document.getElementById('subOutline').value,logo_text:document.getElementById('logoText').value,logo_x:document.getElementById('logoX').value,logo_y:document.getElementById('logoY').value,logo_w:document.getElementById('logoW').value,logo_opacity:document.getElementById('logoOpacity').value,overlay_text:document.getElementById('overlayText').value,subtitles_on:document.getElementById('subtitlesOn').checked,};body.append('url',videoFile?'':videoUrl);body.append('language',document.getElementById('language').value);body.append('gemini_api_key',geminiKey);body.append('groq_api_key',groqKey);Object.entries(options).forEach(([k,v])=>body.append(k,String(v)));if(videoFile)body.append('video',videoFile);body.append('recap_script',document.getElementById('recapScript').value.trim());const wevoFile=document.getElementById('wevolabsVoice').files[0];if(wevoFile)body.append('wevolabs_voice',wevoFile);const logoFile=document.getElementById('logoImage').files[0];if(logoFile)body.append('logo_image',logoFile);const res=await fetch('/api/jobs',{method:'POST',body});const data=await res.json();if(!res.ok)throw new Error(data.error||'စတင်၍မရပါ');poll(data.id);}catch(err){statusBox.textContent='အမှား: '+err.message;btn.disabled=false;}});
+try{const body=new FormData();const options={trim_start:0,trim_end:"",voice:document.getElementById('voice').value,subtitle_pace:document.getElementById('subtitlePace').value,auto_effect:document.getElementById('autoEffect').checked,blur:document.getElementById('blur').value,blur_x:document.getElementById('blurX').value,blur_y:document.getElementById('blurY').value,blur_w:document.getElementById('blurW').value,blur_h:document.getElementById('blurH').value,mirror:document.getElementById('mirror').checked,sub_size:document.getElementById('subSize').value,sub_color:document.getElementById('subColor').value,sub_position:document.getElementById('subPosition').value,sub_x:document.getElementById('subX').value,sub_y:document.getElementById('subY').value,sub_weight:document.getElementById('subWeight').value,sub_outline:document.getElementById('subOutline').value,logo_text:document.getElementById('logoText').value,logo_x:document.getElementById('logoX').value,logo_y:document.getElementById('logoY').value,logo_w:document.getElementById('logoW').value,logo_opacity:document.getElementById('logoOpacity').value,overlay_text:document.getElementById('overlayText').value,subtitles_on:document.getElementById('subtitlesOn').checked,};body.append('url',videoFile?'':videoUrl);body.append('language',document.getElementById('language').value);body.append('gemini_api_key',geminiKey);body.append('groq_api_key',groqKey);Object.entries(options).forEach(([k,v])=>body.append(k,String(v)));if(videoFile)body.append('video',videoFile);body.append('recap_script',document.getElementById('recapScript').value.trim());const wevoFile=document.getElementById('wevolabsVoice').files[0];if(wevoFile)body.append('wevolabs_voice',wevoFile);const logoFile=document.getElementById('logoImage').files[0];if(logoFile)body.append('logo_image',logoFile);const res=await fetch('/api/jobs',{method:'POST',body});const data=await res.json();if(!res.ok)throw new Error(data.error||'စတင်၍မရပါ');poll(data.id);}catch(err){statusBox.textContent='အမှား: '+err.message;btn.disabled=false;}});
 async function poll(id){try{const res=await fetch('/api/jobs/'+id);const data=await res.json();if(!res.ok){if(res.status===404){statusBox.textContent='အရင် Job ကို server မှာ မတွေ့တော့ပါ။ Render restart/redeploy ဖြစ်ခဲ့နိုင်ပါတယ်။ Video ရွေးထားဆဲဆိုရင် Generate Final Video ကို ထပ်နှိပ်ပြီး Job အသစ်စတင်ပါ။';links.innerHTML='';btn.disabled=false;showStep(3);return;}throw new Error(data.error||'အခြေအနေမရပါ');}statusBox.textContent=data.message||data.status;
 if(data.status==='done'){links.innerHTML='<button type="button" id="finalBackBtn" class="back" style="width:100%;margin-bottom:12px">← နောက်သို့ — Edit Tools ပြန်သွားရန်</button><h3>🎬 Final Video Preview</h3><video id="finalVideoPreview" controls playsinline preload="metadata" style="display:block;width:100%;max-height:72vh;aspect-ratio:16/9;object-fit:contain;background:#05070d;border:1px solid #31435e;border-radius:14px;margin:10px 0" src="/api/jobs/'+id+'/preview"></video><a class="download" href="/api/jobs/'+id+'/download">⬇️ Final MP4 ဒေါင်းလုဒ်လုပ်ရန်</a>';document.getElementById('finalBackBtn').addEventListener('click',()=>{document.getElementById('jobform').parentElement.style.display='';showStep(2);document.getElementById('editTools')?.scrollIntoView({behavior:'smooth',block:'start'});});document.getElementById('jobform').parentElement.style.display='none';document.querySelectorAll('main > p.muted').forEach(el=>el.style.display='none');document.querySelector('#result h2').textContent='🎬 Final Video Preview';btn.disabled=false;showStep(3);statusBox.scrollIntoView({behavior:'smooth',block:'center'});loadVideoLibrary();return;}
 if(data.status==='error'){statusBox.textContent='မအောင်မြင်ပါ: '+data.message;btn.disabled=false;return;}setTimeout(()=>poll(id),3000);
 }catch(err){statusBox.textContent='အခြေအနေစစ်ရာတွင် ပြဿနာ: '+err.message;btn.disabled=false;}}
 loadVideoLibrary();
+window.addEventListener('resize',()=>{if(previewVideo.videoWidth&&previewVideo.videoHeight){const ratio=previewVideo.videoWidth/previewVideo.videoHeight;preview.style.width='min(100%, calc(64dvh * '+ratio+'))';preview.style.maxHeight='64dvh';}});
 </script></body></html>
 """
 
@@ -878,26 +830,6 @@ def process_job(job_id, url, language, workdir, gemini_api_key, groq_api_key, op
             update_job(job_id, status="running", message="ဗီဒီယိုကို URL မှ ဒေါင်းလုဒ်လုပ်နေသည်…")
             size, _ = download_video(url, video)
             update_job(job_id, message=f"ဗီဒီယိုရရှိပါပြီ ({size // (1024*1024)} MB)။ အသံထုတ်နေသည်…")
-        # CapCut-style timeline trim: cut the source before transcription/voice fitting/render.
-        try:
-            trim_start = max(0.0, float(options.get("trim_start", 0) or 0))
-            trim_end_raw = str(options.get("trim_end", "") or "").strip()
-            trim_end = float(trim_end_raw) if trim_end_raw else 0.0
-        except (TypeError, ValueError):
-            fail("Timeline Trim Start/End အချိန် မမှန်ပါ။")
-        if trim_start > 0 or trim_end > 0:
-            duration_text = run_command(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", str(video)], timeout=30)
-            source_duration = float(duration_text)
-            actual_end = trim_end if trim_end > 0 else source_duration
-            if trim_start >= source_duration or actual_end > source_duration + 0.2 or actual_end <= trim_start:
-                fail("Timeline Trim အချိန် မမှန်ပါ။ Start သည် End ထက်ငယ်ပြီး Video ကြာချိန်အတွင်း ဖြစ်ရပါမည်။")
-            if trim_start > 0 or actual_end < source_duration - 0.2:
-                update_job(job_id, message="Timeline Trim ကို အသုံးပြုပြီး Video ကို ဖြတ်နေသည်…")
-                trimmed = workdir / "trimmed_source.mp4"
-                run_command(["ffmpeg", "-y", "-ss", f"{trim_start:.3f}", "-i", str(video), "-t", f"{actual_end-trim_start:.3f}", "-map", "0:v:0", "-map", "0:a?", "-c:v", "libx264", "-preset", "ultrafast", "-crf", "22", "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", str(trimmed)], timeout=300)
-                if not trimmed.is_file() or not trimmed.stat().st_size:
-                    fail("Timeline Trim လုပ်၍မရပါ။ Start/End အချိန်ကို ပြန်စစ်ပါ။")
-                os.replace(trimmed, video)
         if recap_script:
             update_job(job_id, message="ထည့်ပေးထားသော Recap Script ကို အသုံးပြုနေသည်…")
             script = clean_myanmar_text(recap_script)
@@ -944,10 +876,8 @@ def process_job(job_id, url, language, workdir, gemini_api_key, groq_api_key, op
         render_video(video, voice, subtitles, output, options, music_path, logo_path)
         save_latest_artifacts(workdir)
         title = JOBS.get(job_id, {}).get("title") or "Movie Recap"
-        # Do not mark a job complete until its final MP4 is safely uploaded.
-        gcs_blob_name = _persist_final_video(job_id, output, title)
         update_job(job_id, status="done", message="ပြီးပါပြီ။ Final MP4 ကို Saved Video Library ထဲတွင် သိမ်းထားပါပြီ။",
-                   output=str(output), gcs_blob=gcs_blob_name, script=str(workdir / "recap.txt"), srt=str(srt_file), voice=str(voice), finished=time.time(), title=title)
+                   output=str(output), script=str(workdir / "recap.txt"), srt=str(srt_file), voice=str(voice), finished=time.time(), title=title)
     except Exception as exc:
         update_job(job_id, status="error", message=str(exc)[:1500], finished=time.time())
     finally:
@@ -1142,31 +1072,8 @@ def create_job():
 
 @app.get("/api/library")
 def video_library():
-    """List retained final MP4s from Cloud Storage, with local fallback for Render/dev."""
+    """List final MP4s retained in the configured local persistent disk."""
     items_by_id = {}
-    bucket = _gcs_bucket()
-    if bucket is not None:
-        try:
-            for blob in bucket.list_blobs(prefix="final-videos/"):
-                match = re.fullmatch(r"final-videos/([a-f0-9]{32})\.mp4", blob.name or "")
-                if not match:
-                    continue
-                job_id = match.group(1)
-                metadata = blob.metadata or {}
-                try:
-                    created = float(metadata.get("created") or (blob.time_created.timestamp() if blob.time_created else time.time()))
-                except (TypeError, ValueError, AttributeError):
-                    created = time.time()
-                items_by_id[job_id] = {
-                    "id": job_id,
-                    "title": str(metadata.get("title") or "Movie Recap")[:180],
-                    "created": created,
-                    "size_bytes": int(blob.size or 0),
-                    "preview_url": f"/api/jobs/{job_id}/preview",
-                    "download_url": f"/api/jobs/{job_id}/download",
-                }
-        except Exception:
-            app.logger.exception("Could not list final videos from Cloud Storage")
     with JOBS_LOCK:
         snapshot = [(job_id, dict(job)) for job_id, job in JOBS.items()]
     for job_id, job in snapshot:
@@ -1188,7 +1095,7 @@ def video_library():
             "download_url": f"/api/jobs/{job_id}/download",
         }
     items = sorted(items_by_id.values(), key=lambda item: float(item["created"] or 0), reverse=True)
-    return jsonify({"videos": items, "count": len(items), "persistent_storage_configured": bool(GCS_BUCKET_NAME or os.getenv("MOVIE_RECAP_DATA_DIR"))})
+    return jsonify({"videos": items, "count": len(items), "persistent_storage_configured": bool(os.getenv("MOVIE_RECAP_DATA_DIR"))})
 
 @app.get("/api/jobs/<job_id>")
 def job_status(job_id):
@@ -1197,13 +1104,6 @@ def job_status(job_id):
         if job:
             safe = {k: v for k, v in job.items() if k in ("status", "message", "created", "finished")}
             return jsonify(safe)
-    blob = _gcs_blob(job_id)
-    if blob is not None:
-        try:
-            if blob.exists():
-                return jsonify({"status": "done", "message": "သိမ်းဆည်းထားသော Final MP4 ကို Cloud Storage မှ ပြန်ရရှိနိုင်ပါသည်။", "finished": time.time()})
-        except Exception:
-            app.logger.exception("Could not check persisted video %s", job_id)
     return jsonify({
         "error": "ဒီ Job ID ကို လက်ရှိ server မှာ မတွေ့တော့ပါ။ အလုပ်လုပ်နေစဉ် server restart ဖြစ်ခဲ့ပါက ပြန်တင်ပြီး Generate Final Video ကို ထပ်နှိပ်ပါ။ သိမ်းပြီးသား Final MP4 များကို Saved Video Library မှ ရယူနိုင်ပါသည်။",
         "recovery": "job_not_found"
