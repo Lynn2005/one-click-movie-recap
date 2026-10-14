@@ -289,7 +289,7 @@ main{padding-left:max(0px,env(safe-area-inset-left));padding-right:max(0px,env(s
 </style>
 </head>
 <body><main>
-<div class="topbar"><div style="display:flex;align-items:center;gap:8px;min-width:0"><button class="settings-btn" id="newJobBtn" type="button">＋ New</button><h1>🎬 One Click Movie Recap</h1></div><div style="display:flex;flex-direction:column;gap:6px;align-items:stretch"><button class="settings-btn" id="themeToggle" type="button" aria-label="Toggle light and dark theme">☀️ Light</button><button class="settings-btn" id="openSettings" type="button">⚙️ Settings</button><button class="settings-btn" id="openDashboard" type="button" aria-label="Open Dashboard">▦ Dashboard</button></div></div>
+<div class="topbar"><div style="display:flex;align-items:center;gap:8px;min-width:0"><h1>🎬 One Click Movie Recap</h1></div><div style="display:flex;flex-direction:column;gap:6px;align-items:stretch"><button class="settings-btn" id="themeToggle" type="button" aria-label="Toggle light and dark theme">☀️ Light</button><button class="settings-btn" id="openSettings" type="button">⚙️ Settings</button><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px"><button class="settings-btn" id="newJobBtn" type="button">＋ New</button><button class="settings-btn" id="openDashboard" type="button" aria-label="Open Dashboard">▦ Dashboard</button></div></div></div>
 <p class="muted">Video ထည့်ပါ → Recap MP4 ထုတ်ပါ</p>
 
 </section>
