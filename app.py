@@ -685,7 +685,25 @@ def render_video(video_path, voice_path, srt_path, output_path, options, music_p
 
     logo = ""
     overlay = (options.get("overlay_text") or "").strip()
-    base_filters = []
+
+    # Use the full source video and fit its playback timeline to the final AI voice.
+    # Faster narration speeds the video up; longer narration slows the video down.
+    # This keeps video, voice, and subtitles ending together instead of cutting the
+    # source video off at the narration endpoint.
+    video_duration_text = run_command(["ffprobe", "-v", "error", "-show_entries", "format=duration",
+                                       "-of", "default=noprint_wrappers=1:nokey=1", str(video_path)], timeout=30)
+    voice_duration_text = run_command(["ffprobe", "-v", "error", "-show_entries", "format=duration",
+                                       "-of", "default=noprint_wrappers=1:nokey=1", str(voice_path)], timeout=30)
+    try:
+        source_video_duration = float(video_duration_text)
+        target_voice_duration = float(voice_duration_text)
+    except (TypeError, ValueError):
+        fail("Video/AI Voice duration ကို မဖတ်နိုင်ပါ။")
+    if source_video_duration <= 0 or target_voice_duration <= 0:
+        fail("Video သို့မဟုတ် AI Voice duration မမှန်ပါ။")
+    video_tempo_factor = target_voice_duration / source_video_duration
+
+    base_filters = [f"setpts=PTS*{video_tempo_factor:.10f}"]
     if options.get("mirror"):
         base_filters.append("hflip")
     if options.get("auto_effect", True):
