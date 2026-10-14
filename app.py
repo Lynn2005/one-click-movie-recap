@@ -289,7 +289,7 @@ main{padding-left:max(0px,env(safe-area-inset-left));padding-right:max(0px,env(s
 </style>
 </head>
 <body><main>
-<div class="topbar"><div style="display:flex;align-items:center;gap:8px;min-width:0"><button class="settings-btn" id="newJobBtn" type="button">＋ New</button><h1>🎬 One Click Movie Recap</h1></div><div style="display:flex;gap:7px;align-items:center"><button class="settings-btn" id="themeToggle" type="button" aria-label="Toggle light and dark theme">☀️ Light</button><button class="settings-btn" id="openSettings" type="button">⚙️ Settings</button></div></div>
+<div class="topbar"><div style="display:flex;align-items:center;gap:8px;min-width:0"><button class="settings-btn" id="newJobBtn" type="button">＋ New</button><h1>🎬 One Click Movie Recap</h1></div><div style="display:flex;flex-direction:column;gap:6px;align-items:stretch"><button class="settings-btn" id="themeToggle" type="button" aria-label="Toggle light and dark theme">☀️ Light</button><button class="settings-btn" id="openSettings" type="button">⚙️ Settings</button><button class="settings-btn" id="openDashboard" type="button" aria-label="Open Dashboard">▦ Dashboard</button></div></div>
 <p class="muted">Video ထည့်ပါ → Recap MP4 ထုတ်ပါ</p>
 
 </section>
@@ -335,11 +335,28 @@ main{padding-left:max(0px,env(safe-area-inset-left));padding-right:max(0px,env(s
 <button id="submit" type="submit">🎬 Generate Final Video</button><div class="wizard-nav"><button type="button" class="back back-step" data-back="1">← Back to Voice</button></div></section>
 </form></div>
 <div id="result" class="panel hidden"><div id="loadingPercent" class="loading-percent">0%</div><div class="loading-track"><div id="loadingBar" class="loading-bar" style="width:0%"></div></div><div id="status" class="status" aria-live="polite"></div><div id="links"></div></div>
-<div id="savedVideos" class="panel"><h2>📁 သိမ်းထားသော Final Videos</h2><p class="muted small">Reload လုပ်ပြီးနောက် အရင်ထုတ်ထားတဲ့ Video တွေကို ဒီမှာ ပြန်ဖွင့်နိုင်ပါတယ်။</p><div id="savedVideosList">သိမ်းထားသော Video များကို စစ်ဆေးနေသည်…</div><p id="storageNote" class="muted small"></p></div>
+<section id="dashboardPanel" class="panel hidden"><div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap"><div><h2 style="margin:0">▦ Dashboard</h2><p class="muted small">ထုတ်ပြီးသိမ်းထားသော Final Video များကို ပြန်ဖွင့်၊ ဒေါင်းလုဒ်လုပ်နိုင်သည်။</p></div><button type="button" id="dashboardNewBtn" class="settings-btn">＋ New Recap</button></div><div id="savedVideos"><h3>🎬 Final Videos</h3><div id="savedVideosList">သိမ်းထားသော Video များကို စစ်ဆေးနေသည်…</div><p id="storageNote" class="muted small"></p></div></section>
 <p class="muted small">Gemini 3.8 Flash · ကိုယ်အသုံးပြုခွင့်ရှိသော ဗီဒီယိုကိုသာ အသုံးပြုပါ။</p>
 </main>
 <script>
-const form=document.getElementById('jobform'),btn=document.getElementById('submit'),result=document.getElementById('result');let statusBox=document.getElementById('status');if(!statusBox){statusBox=document.createElement('div');statusBox.id='status';statusBox.className='status';statusBox.setAttribute('aria-live','polite');(result||document.body).appendChild(statusBox);}const links=document.getElementById('links')||(()=>{const el=document.createElement('div');el.id='links';(result||document.body).appendChild(el);return el;})();const loadingPercent=document.getElementById('loadingPercent')||(()=>{const el=document.createElement('div');el.id='loadingPercent';el.className='loading-percent';el.textContent='0%';(result||document.body).prepend(el);return el;})();const loadingBar=document.getElementById('loadingBar')||(()=>{const track=document.createElement('div');track.className='loading-track';const el=document.createElement('div');el.id='loadingBar';el.className='loading-bar';el.style.width='0%';track.appendChild(el);(result||document.body).insertBefore(track,statusBox);return el;})();function setProgress(value){const p=Math.max(0,Math.min(100,Number(value)||0));loadingPercent.textContent=p+'%';loadingBar.style.width=p+'%';}
+const form=document.getElementById('jobform'),btn=document.getElementById('submit'),result=document.getElementById('result');
+const dashboardPanel=document.getElementById('dashboardPanel');
+function showDashboard(){
+ document.getElementById('jobform').parentElement.classList.add('hidden');
+ document.getElementById('result').classList.add('hidden');
+ dashboardPanel.classList.remove('hidden');
+ loadSavedVideos();
+ dashboardPanel.scrollIntoView({behavior:'smooth',block:'start'});
+}
+function showRecapForm(){
+ dashboardPanel.classList.add('hidden');
+ document.getElementById('jobform').parentElement.classList.remove('hidden');
+ document.getElementById('result').classList.add('hidden');
+ document.getElementById('jobform').parentElement.scrollIntoView({behavior:'smooth',block:'start'});
+}
+document.getElementById('openDashboard').addEventListener('click',showDashboard);
+document.getElementById('dashboardNewBtn').addEventListener('click',showRecapForm);
+let statusBox=document.getElementById('status');if(!statusBox){statusBox=document.createElement('div');statusBox.id='status';statusBox.className='status';statusBox.setAttribute('aria-live','polite');(result||document.body).appendChild(statusBox);}const links=document.getElementById('links')||(()=>{const el=document.createElement('div');el.id='links';(result||document.body).appendChild(el);return el;})();const loadingPercent=document.getElementById('loadingPercent')||(()=>{const el=document.createElement('div');el.id='loadingPercent';el.className='loading-percent';el.textContent='0%';(result||document.body).prepend(el);return el;})();const loadingBar=document.getElementById('loadingBar')||(()=>{const track=document.createElement('div');track.className='loading-track';const el=document.createElement('div');el.id='loadingBar';el.className='loading-bar';el.style.width='0%';track.appendChild(el);(result||document.body).insertBefore(track,statusBox);return el;})();function setProgress(value){const p=Math.max(0,Math.min(100,Number(value)||0));loadingPercent.textContent=p+'%';loadingBar.style.width=p+'%';}
 document.getElementById('newJobBtn').addEventListener('click',()=>{if(btn.disabled&&!confirm('လက်ရှိလုပ်ဆောင်နေသော Job ကို စောင့်မနေဘဲ စာမျက်နှာအသစ်ဖွင့်မလား။'))return;window.location.reload();});
 const geminiInput=document.getElementById('geminiKey'),groqInput=document.getElementById('groqKey'),keyStatus=document.getElementById('keyStatus');
 const settingsWrap=document.getElementById('settingsWrap');const themeToggle=document.getElementById('themeToggle');function applyTheme(theme){document.body.classList.toggle('light',theme==='light');themeToggle.textContent=theme==='light'?'🌙 Dark':'☀️ Light';try{localStorage.setItem('oneclick_theme',theme);}catch(e){}}let savedTheme='dark';try{savedTheme=localStorage.getItem('oneclick_theme')||'dark';}catch(e){}applyTheme(savedTheme);themeToggle.addEventListener('click',()=>applyTheme(document.body.classList.contains('light')?'dark':'light'));document.getElementById('openSettings').addEventListener('click',()=>settingsWrap.classList.remove('hidden'));function bindKeyToggle(buttonId,input){const toggle=document.getElementById(buttonId);toggle.addEventListener('click',()=>{const showing=input.type==='text';input.type=showing?'password':'text';toggle.textContent=showing?'ကြည့်ရန်':'ဖျောက်ရန်';toggle.setAttribute('aria-label',(showing?'Show':'Hide')+' API key');});}bindKeyToggle('toggleGeminiKey',geminiInput);bindKeyToggle('toggleGroqKey',groqInput);document.getElementById('closeSettings').addEventListener('click',()=>settingsWrap.classList.add('hidden'));settingsWrap.addEventListener('click',e=>{if(e.target===settingsWrap)settingsWrap.classList.add('hidden');});
