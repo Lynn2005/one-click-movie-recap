@@ -39,6 +39,55 @@ LATEST_ROOT = DATA_ROOT / "latest-artifacts"
 LATEST_ROOT.mkdir(parents=True, exist_ok=True)
 JOB_DB = DATA_ROOT / "jobs.sqlite3"
 
+# Cloud Run's writable filesystem is ephemeral. Store completed MP4s in a private bucket.
+GCS_BUCKET_NAME = (os.getenv("GCS_BUCKET") or "").strip()
+_GCS_CLIENT = None
+_GCS_LOCK = threading.Lock()
+
+def _gcs_bucket():
+    global _GCS_CLIENT
+    if not GCS_BUCKET_NAME:
+        return None
+    with _GCS_LOCK:
+        if _GCS_CLIENT is None:
+            from google.cloud import storage
+            _GCS_CLIENT = storage.Client()
+    return _GCS_CLIENT.bucket(GCS_BUCKET_NAME)
+
+def _gcs_blob(job_id):
+    bucket = _gcs_bucket()
+    if bucket is None or not re.fullmatch(r"[a-f0-9]{32}", str(job_id)):
+        return None
+    return bucket.blob(f"final-videos/{job_id}.mp4")
+
+def _persist_final_video(job_id, output_path, title):
+    blob = _gcs_blob(job_id)
+    if blob is None:
+        return None
+    blob.metadata = {"title": str(title or "Movie Recap")[:180], "job_id": str(job_id), "created": str(time.time())}
+    blob.upload_from_filename(str(output_path), content_type="video/mp4", timeout=900)
+    return blob.name
+
+def _get_final_video_path(job_id, job=None):
+    expected = OUTPUT_ROOT / str(job_id) / "movie_recap.mp4"
+    if expected.is_file():
+        return expected
+    blob = _gcs_blob(job_id)
+    if blob is None:
+        return None
+    try:
+        if not blob.exists():
+            return None
+        cache_root = Path(tempfile.gettempdir()) / "movie-recap-gcs-cache"
+        cache_root.mkdir(parents=True, exist_ok=True)
+        cached = cache_root / f"{job_id}.mp4"
+        if not cached.is_file() or cached.stat().st_size == 0:
+            blob.download_to_filename(str(cached), timeout=900)
+        return cached if cached.is_file() and cached.stat().st_size else None
+    except Exception:
+        app.logger.exception("Could not fetch persisted final video %s from Cloud Storage", job_id)
+        return None
+
 def _db_connect():
     connection = sqlite3.connect(str(JOB_DB, ), timeout=10)
     connection.execute("CREATE TABLE IF NOT EXISTS jobs (id TEXT PRIMARY KEY, payload TEXT NOT NULL)")
@@ -845,8 +894,11 @@ def process_job(job_id, url, language, workdir, gemini_api_key, groq_api_key, op
         update_job(job_id, message="နောက်ဆုံး MP4 ကို တည်ဆောက်နေသည်။ ခဏစောင့်ပါ…")
         render_video(video, voice, subtitles, output, options, music_path, logo_path)
         save_latest_artifacts(workdir)
+        title = JOBS.get(job_id, {}).get("title") or "Movie Recap"
+        # Do not mark a job complete until its final MP4 is safely uploaded.
+        gcs_blob_name = _persist_final_video(job_id, output, title)
         update_job(job_id, status="done", message="ပြီးပါပြီ။ Final MP4 ကို Saved Video Library ထဲတွင် သိမ်းထားပါပြီ။",
-                   output=str(output), script=str(workdir / "recap.txt"), srt=str(srt_file), voice=str(voice), finished=time.time(), title=JOBS.get(job_id, {}).get("title") or "Movie Recap")
+                   output=str(output), gcs_blob=gcs_blob_name, script=str(workdir / "recap.txt"), srt=str(srt_file), voice=str(voice), finished=time.time(), title=title)
     except Exception as exc:
         update_job(job_id, status="error", message=str(exc)[:1500], finished=time.time())
     finally:
@@ -1041,12 +1093,35 @@ def create_job():
 
 @app.get("/api/library")
 def video_library():
-    """List all completed final MP4s whose files remain on the configured data volume."""
-    items = []
+    """List retained final MP4s from Cloud Storage, with local fallback for Render/dev."""
+    items_by_id = {}
+    bucket = _gcs_bucket()
+    if bucket is not None:
+        try:
+            for blob in bucket.list_blobs(prefix="final-videos/"):
+                match = re.fullmatch(r"final-videos/([a-f0-9]{32})\.mp4", blob.name or "")
+                if not match:
+                    continue
+                job_id = match.group(1)
+                metadata = blob.metadata or {}
+                try:
+                    created = float(metadata.get("created") or (blob.time_created.timestamp() if blob.time_created else time.time()))
+                except (TypeError, ValueError, AttributeError):
+                    created = time.time()
+                items_by_id[job_id] = {
+                    "id": job_id,
+                    "title": str(metadata.get("title") or "Movie Recap")[:180],
+                    "created": created,
+                    "size_bytes": int(blob.size or 0),
+                    "preview_url": f"/api/jobs/{job_id}/preview",
+                    "download_url": f"/api/jobs/{job_id}/download",
+                }
+        except Exception:
+            app.logger.exception("Could not list final videos from Cloud Storage")
     with JOBS_LOCK:
         snapshot = [(job_id, dict(job)) for job_id, job in JOBS.items()]
     for job_id, job in snapshot:
-        if job.get("status") != "done":
+        if job.get("status") != "done" or job_id in items_by_id:
             continue
         path = Path(job.get("output", ""))
         if not path.is_file() or path.parent.parent != OUTPUT_ROOT or path.suffix.lower() != ".mp4":
@@ -1055,48 +1130,55 @@ def video_library():
             stat = path.stat()
         except OSError:
             continue
-        items.append({
+        items_by_id[job_id] = {
             "id": job_id,
             "title": str(job.get("title") or "Movie Recap")[:180],
             "created": job.get("finished") or job.get("created") or stat.st_mtime,
             "size_bytes": stat.st_size,
             "preview_url": f"/api/jobs/{job_id}/preview",
             "download_url": f"/api/jobs/{job_id}/download",
-        })
-    items.sort(key=lambda item: float(item["created"] or 0), reverse=True)
-    return jsonify({"videos": items, "count": len(items), "persistent_storage_configured": bool(os.getenv("MOVIE_RECAP_DATA_DIR"))})
+        }
+    items = sorted(items_by_id.values(), key=lambda item: float(item["created"] or 0), reverse=True)
+    return jsonify({"videos": items, "count": len(items), "persistent_storage_configured": bool(GCS_BUCKET_NAME or os.getenv("MOVIE_RECAP_DATA_DIR"))})
 
 @app.get("/api/jobs/<job_id>")
 def job_status(job_id):
     with JOBS_LOCK:
         job = JOBS.get(job_id)
-        if not job:
-            return jsonify({
-                "error": "ဒီ Job ID ကို လက်ရှိ server မှာ မတွေ့တော့ပါ။ Render restart/redeploy ဖြစ်ခဲ့နိုင်ပါတယ်။ Video ဖိုင်ရှိနေသေးလျှင် Generate Final Video ကို ပြန်နှိပ်ပါ။",
-                "recovery": "job_not_found"
-            }), 404
-        safe = {k: v for k, v in job.items() if k in ("status", "message", "created", "finished")}
-        return jsonify(safe)
+        if job:
+            safe = {k: v for k, v in job.items() if k in ("status", "message", "created", "finished")}
+            return jsonify(safe)
+    blob = _gcs_blob(job_id)
+    if blob is not None:
+        try:
+            if blob.exists():
+                return jsonify({"status": "done", "message": "သိမ်းဆည်းထားသော Final MP4 ကို Cloud Storage မှ ပြန်ရရှိနိုင်ပါသည်။", "finished": time.time()})
+        except Exception:
+            app.logger.exception("Could not check persisted video %s", job_id)
+    return jsonify({
+        "error": "ဒီ Job ID ကို လက်ရှိ server မှာ မတွေ့တော့ပါ။ အလုပ်လုပ်နေစဉ် server restart ဖြစ်ခဲ့ပါက ပြန်တင်ပြီး Generate Final Video ကို ထပ်နှိပ်ပါ။ သိမ်းပြီးသား Final MP4 များကို Saved Video Library မှ ရယူနိုင်ပါသည်။",
+        "recovery": "job_not_found"
+    }), 404
 
 @app.get("/api/jobs/<job_id>/download")
 def download_job(job_id):
     with JOBS_LOCK:
-        job = JOBS.get(job_id)
-    if not job or job.get("status") != "done":
+        job = dict(JOBS.get(job_id) or {})
+    if job and job.get("status") != "done":
         abort(404)
-    path = Path(job.get("output", ""))
-    if not path.is_file() or path.parent.parent != OUTPUT_ROOT:
+    path = _get_final_video_path(job_id, job)
+    if path is None:
         abort(404)
-    return send_file(path, as_attachment=True, download_name="movie_recap.mp4", mimetype="video/mp4")
+    return send_file(path, as_attachment=True, download_name="movie_recap.mp4", mimetype="video/mp4", conditional=True)
 
 @app.get("/api/jobs/<job_id>/preview")
 def preview_job(job_id):
     with JOBS_LOCK:
-        job = JOBS.get(job_id)
-    if not job or job.get("status") != "done":
+        job = dict(JOBS.get(job_id) or {})
+    if job and job.get("status") != "done":
         abort(404)
-    path = Path(job.get("output", ""))
-    if not path.is_file() or path.parent.parent != OUTPUT_ROOT:
+    path = _get_final_video_path(job_id, job)
+    if path is None:
         abort(404)
     response = send_file(path, as_attachment=False, download_name="movie_recap.mp4", mimetype="video/mp4", conditional=True)
     response.headers["Accept-Ranges"] = "bytes"
