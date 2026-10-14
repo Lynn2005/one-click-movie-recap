@@ -774,7 +774,7 @@ def make_recap(transcript, language, api_key):
     return "\n\n".join(sections)
 
 def synthesize_voice(script, language, audio_path, voice, voice_speed=100, boundaries_path=None):
-    """Generate TTS in short sentence chunks; use stream word timings when available."""
+    """Generate Burmese narration in short requests, retrying with a fallback Myanmar voice."""
     import asyncio
     import tempfile
     text = clean_myanmar_text(script).strip()
@@ -782,81 +782,51 @@ def synthesize_voice(script, language, audio_path, voice, voice_speed=100, bound
         fail("AI Voice ဖန်တီးရန် Script အလွတ်ဖြစ်နေသည်။")
     speed = max(70, min(130, int(voice_speed)))
     rate = f"{speed - 100:+d}%"
-    # Keep each request short to avoid Edge TTS returning 'No audio was received'
-    # for long Myanmar narration requests.
-    parts = split_sentences(text)
+    parts = [p.strip() for p in split_sentences(text) if p.strip()] or [text]
     temp_dir = Path(tempfile.mkdtemp(prefix="lynn_tts_"))
     audio_parts = []
-    all_boundaries = []
-    elapsed = 0.0
     last_error = None
+    async def save_part(part, output):
+        errors = []
+        candidates = []
+        for candidate in (voice, "my-MM-ThihaNeural", "my-MM-NilarNeural"):
+            if candidate and candidate not in candidates:
+                candidates.append(candidate)
+        for candidate in candidates:
+            for attempt in range(2):
+                try:
+                    if output.exists():
+                        output.unlink()
+                    # save() is more robust than manually consuming the streaming API.
+                    communicate = edge_tts.Communicate(part, candidate, rate=rate)
+                    await communicate.save(str(output))
+                    if output.exists() and output.stat().st_size > 0:
+                        return
+                    raise RuntimeError("No audio was received")
+                except Exception as exc:
+                    errors.append(f"{candidate}: {exc}")
+                    await asyncio.sleep(1 + attempt)
+        raise RuntimeError("; ".join(errors)[-400:])
     try:
-        async def synthesize_part(part, part_path):
-            errors = []
-            for candidate_voice in (voice, "my-MM-ThihaNeural" if voice != "my-MM-ThihaNeural" else "my-MM-NilarNeural"):
-                for attempt in range(2):
-                    try:
-                        communicate = edge_tts.Communicate(part, candidate_voice, rate=rate)
-                        boundaries = []
-                        audio_bytes = bytearray()
-                        async for chunk in communicate.stream():
-                            kind = chunk.get("type")
-                            data = chunk.get("data", chunk)
-                            if kind == "audio":
-                                audio_bytes.extend(chunk.get("data", b""))
-                            elif kind == "WordBoundary":
-                                try:
-                                    boundaries.append({
-                                        "offset": max(0.0, float(data.get("offset", 0))/10_000_000),
-                                        "duration": max(0.0, float(data.get("duration", 0))/10_000_000),
-                                        "text": str(data.get("text", "")),
-                                        "text_offset": int(data.get("text_offset", -1)),
-                                        "word_length": int(data.get("word_length", 0)),
-                                    })
-                                except (TypeError, ValueError):
-                                    pass
-                        if audio_bytes:
-                            part_path.write_bytes(audio_bytes)
-                            return boundaries
-                        raise RuntimeError("No audio was received")
-                    except Exception as exc:
-                        errors.append(f"{candidate_voice}: {exc}")
-                        await asyncio.sleep(1 + attempt)
-            raise RuntimeError("; ".join(errors)[-500:])
-
         for index, part in enumerate(parts):
             part_path = temp_dir / f"part_{index:05d}.mp3"
             try:
-                boundaries = asyncio.run(synthesize_part(part, part_path))
+                asyncio.run(save_part(part, part_path))
+                audio_parts.append(part_path)
             except Exception as exc:
                 last_error = exc
-                continue
-            # Chunk-local offsets are converted to cumulative offsets for SRT creation.
-            for item in boundaries:
-                item["offset"] = float(item.get("offset", 0)) + elapsed
-                item["text_offset"] = -1  # chunk offsets are local; use fallback SRT if any chunk failed
-                all_boundaries.append(item)
-            audio_parts.append(part_path)
-            try:
-                elapsed += float(run_command(["ffprobe", "-v", "error", "-show_entries", "format=duration",
-                    "-of", "default=noprint_wrappers=1:nokey=1", str(part_path)], timeout=20))
-            except Exception:
-                elapsed += 0.0
-
-        if not audio_parts:
-            fail("AI Voice ဖန်တီးမရပါ။ Edge TTS မှ အသံမရပါ။ Internet/voice service ကို စစ်ပြီး ပြန်စမ်းပါ။ Error: " + str(last_error)[:250])
+                break
+        if len(audio_parts) != len(parts):
+            fail("AI Voice ဖန်တီးမရပါ။ Myanmar TTS က အသံမပေးပါ။ ခဏနောက်ပြန်စမ်းပါ။ Error: " + str(last_error)[:250])
         concat_file = temp_dir / "concat.txt"
-        concat_file.write_text("".join("file '" + str(p).replace("'", "'\\''") + "'\n" for p in audio_parts), encoding="utf-8")
+        concat_file.write_text("".join("file '" + str(p).replace("'", "'\\''") + "'\\n" for p in audio_parts), encoding="utf-8")
         run_command(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(concat_file),
                      "-c:a", "libmp3lame", "-q:a", "3", str(audio_path)], timeout=300)
         if not audio_path.exists() or audio_path.stat().st_size == 0:
             fail("AI Voice အသံဖိုင်ကို ပေါင်းစည်းမရပါ။")
         if boundaries_path:
-            # Only keep timings when every chunk succeeded and offsets are meaningful.
-            valid = all(len(parts) == len(audio_parts) for _ in [0]) and bool(all_boundaries) and all(b.get("text_offset", -1) >= 0 for b in all_boundaries)
-            Path(boundaries_path).write_text(json.dumps(all_boundaries if valid else [], ensure_ascii=False), encoding="utf-8")
-        if len(audio_parts) != len(parts):
-            fail("AI Voice အပိုင်းအချို့ မထွက်လာပါ။ ချို့တဲ့နေသောအပိုင်းများမပါဘဲ Final မထုတ်နိုင်ပါ။ Error: " + str(last_error)[:200])
+            # Use the safe duration-weighted SRT fallback until reliable word timings are available.
+            Path(boundaries_path).write_text("[]", encoding="utf-8")
     finally:
         shutil.rmtree(temp_dir, ignore_errors=True)
 
