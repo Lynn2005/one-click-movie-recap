@@ -486,11 +486,22 @@ async function loadSavedVideos(){
   const jobs=data.jobs||[];
   if(!jobs.length){list.textContent='သိမ်းထားသော Final Video မရှိသေးပါ။';}
   else{
-   list.innerHTML=jobs.map(job=>'<div style="border:1px solid var(--border);border-radius:12px;padding:12px;margin:10px 0;background:var(--panel2)"><strong style="overflow-wrap:anywhere">'+escapeHistoryText(job.title)+'</strong><p class="muted small">ပြီးစီးချိန်: '+(job.finished?new Date(job.finished*1000).toLocaleString():'မသိရသေး')+'</p><div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" data-history-preview="'+job.id+'" style="width:auto;flex:1;margin:0">▶ ပြန်ဖွင့်ရန်</button><a class="download" style="width:auto;flex:1;margin:0" href="'+job.download_url+'">⬇️ MP4 သိမ်းရန်</a></div><div id="history-player-'+job.id+'"></div></div>').join('');
+   list.innerHTML=jobs.map(job=>'<div style="border:1px solid var(--border);border-radius:12px;padding:12px;margin:10px 0;background:var(--panel2)"><strong style="overflow-wrap:anywhere">'+escapeHistoryText(job.title)+'</strong><p class="muted small">ပြီးစီးချိန်: '+(job.finished?new Date(job.finished*1000).toLocaleString():'မသိရသေး')+'</p><div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" data-history-preview="'+job.id+'" style="width:auto;flex:1;margin:0">▶ ပြန်ဖွင့်ရန်</button><a class="download" style="width:auto;flex:1;margin:0" href="'+job.download_url+'">⬇️ MP4 သိမ်းရန်</a><button type="button" data-history-delete="'+job.id+'" style="width:auto;flex:1;margin:0;background:#b42332;color:#fff;border-color:#b42332">🗑️ ဖျက်ရန်</button></div><div id="history-player-'+job.id+'"></div></div>').join('');
    list.querySelectorAll('[data-history-preview]').forEach(button=>button.addEventListener('click',()=>{
     const id=button.getAttribute('data-history-preview'),slot=document.getElementById('history-player-'+id);
     slot.innerHTML='<video controls playsinline preload="metadata" style="display:block;width:100%;max-height:65vh;aspect-ratio:16/9;object-fit:contain;background:#05070d;border-radius:12px;margin-top:12px" src="/api/jobs/'+id+'/preview"></video>';
     slot.scrollIntoView({behavior:'smooth',block:'nearest'});
+   }));
+   list.querySelectorAll('[data-history-delete]').forEach(button=>button.addEventListener('click',async()=>{
+    const id=button.getAttribute('data-history-delete');
+    if(!confirm('ဒီ Final Video နဲ့ သိမ်းထားတဲ့ဖိုင်တွေကို အပြီးဖျက်မှာ သေချာပါသလား။'))return;
+    button.disabled=true;button.textContent='ဖျက်နေသည်…';
+    try{
+     const res=await fetch('/api/jobs/'+encodeURIComponent(id),{method:'DELETE'});
+     const data=await res.json();
+     if(!res.ok)throw new Error(data.error||'ဖျက်မရပါ');
+     await loadSavedVideos();
+    }catch(err){alert('ဖျက်မရပါ: '+err.message);button.disabled=false;button.textContent='🗑️ ဖျက်ရန်';}
    }));
   }
   note.textContent=data.persistent_storage_configured?'Server storage: persistent disk path detected.':'သတိပြုရန် — Reload သာမက Render restart/redeploy ပြီးနောက်လည်း မပျောက်စေရန် Render တွင် Persistent Disk ကို /var/data တွင် Mount လုပ်ပါ။';
@@ -1248,6 +1259,49 @@ def list_jobs():
                          "download_url": "/api/jobs/" + job_id + "/download"})
     jobs.sort(key=lambda item: item.get("finished") or item.get("created") or 0, reverse=True)
     return jsonify({"jobs": jobs[:100], "persistent_storage_configured": _r2_configured() or bool(os.getenv("MOVIE_RECAP_DATA_DIR") or (os.getenv("RENDER") and Path("/var/data").is_dir())), "cloudflare_r2_configured": _r2_configured()})
+
+@app.delete("/api/jobs/<job_id>")
+def delete_job(job_id):
+    """Delete a completed recap from local storage and configured Cloudflare R2."""
+    from flask import jsonify
+    if not re.fullmatch(r"[A-Za-z0-9_-]{1,100}", job_id):
+        return jsonify({"error": "Job ID မမှန်ပါ။"}), 400
+    with JOBS_LOCK:
+        job = JOBS.get(job_id)
+        if job is None:
+            try:
+                with _db_connect() as connection:
+                    row = connection.execute("SELECT payload FROM jobs WHERE id=?", (job_id,)).fetchone()
+                if row:
+                    job = json.loads(row[0])
+            except (OSError, sqlite3.Error, TypeError, ValueError):
+                job = None
+        if job is None:
+            job = _r2_get_job(job_id)
+        if not job:
+            return jsonify({"error": "ဖျက်မည့် Video ကို မတွေ့ပါ။"}), 404
+        if job.get("status") in ("queued", "running"):
+            return jsonify({"error": "Processing လုပ်နေသော Job ကို မဖျက်နိုင်ပါ။ ပြီးဆုံးပြီးမှ ဖျက်ပါ။"}), 409
+        try:
+            folder = (OUTPUT_ROOT / job_id).resolve()
+            if folder.parent != OUTPUT_ROOT.resolve():
+                return jsonify({"error": "ဖိုင်လမ်းကြောင်း မမှန်ပါ။"}), 400
+            if folder.exists():
+                shutil.rmtree(folder)
+            client = _r2_client()
+            if client is not None:
+                paginator = client.get_paginator("list_objects_v2")
+                for page in paginator.paginate(Bucket=os.environ["R2_BUCKET_NAME"], Prefix="jobs/" + job_id + "/"):
+                    objects = [{"Key": item["Key"]} for item in page.get("Contents", []) if item.get("Key")]
+                    if objects:
+                        client.delete_objects(Bucket=os.environ["R2_BUCKET_NAME"], Delete={"Objects": objects, "Quiet": True})
+            with _db_connect() as connection:
+                connection.execute("DELETE FROM jobs WHERE id=?", (job_id,))
+            JOBS.pop(job_id, None)
+            return jsonify({"ok": True, "message": "Final Video ကို ဖျက်ပြီးပါပြီ။"})
+        except Exception as exc:
+            return jsonify({"error": "ဖိုင်ဖျက်ရာတွင် ပြဿနာရှိသည်: " + str(exc)[:200]}), 500
+
 
 @app.post("/api/jobs")
 def create_job():
