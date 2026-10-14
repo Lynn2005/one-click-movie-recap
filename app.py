@@ -972,13 +972,38 @@ def create_job():
 
 @app.get("/api/jobs/<job_id>")
 def job_status(job_id):
+    # In-memory state is process-local. Recover it from SQLite when requests
+    # land on another worker/process, then return a clear restart state if needed.
     with JOBS_LOCK:
         job = JOBS.get(job_id)
         if job:
             safe = {k: v for k, v in job.items() if k in ("status", "message", "progress", "created", "finished")}
             return jsonify(safe)
+
+    recovered = None
+    try:
+        with _db_connect() as connection:
+            row = connection.execute("SELECT payload FROM jobs WHERE id=?", (job_id,)).fetchone()
+        if row:
+            recovered = json.loads(row[0])
+    except (OSError, sqlite3.Error, TypeError, ValueError, json.JSONDecodeError):
+        recovered = None
+
+    if recovered:
+        # A finished artifact is authoritative even if this worker has stale memory.
+        final_path = _get_final_video_path(job_id, recovered)
+        if final_path and final_path.is_file():
+            recovered.update(status="done", progress=100, message="ပြီးပါပြီ။ Final Video ကို ကြည့်ရှု/ဒေါင်းလုဒ်လုပ်နိုင်ပါပြီ။", finished=recovered.get("finished") or time.time())
+        elif recovered.get("status") in ("queued", "running"):
+            recovered.update(status="error", message="Server process ပြန်စတင်သွားသောကြောင့် လုပ်ဆောင်နေဆဲ Job ကို ဆက်မလုပ်နိုင်တော့ပါ။ Video ကို ပြန်တင်ပြီး Generate Final Video ကို ထပ်နှိပ်ပါ။", finished=time.time())
+        with JOBS_LOCK:
+            JOBS[job_id] = recovered
+            _save_job_locked(job_id)
+        safe = {k: v for k, v in recovered.items() if k in ("status", "message", "progress", "created", "finished")}
+        return jsonify(safe)
+
     return jsonify({
-        "error": "ဒီ Job ID ကို လက်ရှိ server မှာ မတွေ့တော့ပါ။ အလုပ်လုပ်နေစဉ် server restart ဖြစ်ခဲ့ပါက ပြန်တင်ပြီး Generate Final Video ကို ထပ်နှိပ်ပါ။ Final MP4 မရှိပါက Video ကို ပြန်တင်ပြီး Generate Final Video ကို ထပ်နှိပ်ပါ။",
+        "error": "ဒီ Job ID ကို server မှာ မတွေ့တော့ပါ။ Render restart ဖြစ်ပြီး Job data မကျန်တော့နိုင်ပါ။ Video ကို ပြန်ရွေးပြီး Generate Final Video ကို ထပ်နှိပ်ပါ။",
         "recovery": "job_not_found"
     }), 404
 
