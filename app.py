@@ -31,7 +31,10 @@ JOBS_LOCK = threading.Lock()
 # Set MOVIE_RECAP_DATA_DIR to a mounted persistent disk (for example /var/data)
 # on hosts that support it. Without that setting, the default temporary directory
 # is convenient but is not durable across host restarts/redeploys.
-DATA_ROOT = Path(os.getenv("MOVIE_RECAP_DATA_DIR") or (Path(tempfile.gettempdir()) / "movie-recap-data"))
+# Render persistent disks are commonly mounted at /var/data. If the disk is attached,
+# prefer it by default; otherwise use the temporary fallback and warn in the UI/API.
+_default_data_root = Path("/var/data") if Path("/var/data").is_dir() and os.getenv("RENDER") else (Path(tempfile.gettempdir()) / "movie-recap-data")
+DATA_ROOT = Path(os.getenv("MOVIE_RECAP_DATA_DIR") or _default_data_root)
 DATA_ROOT.mkdir(parents=True, exist_ok=True)
 OUTPUT_ROOT = DATA_ROOT / "movie-recap-jobs"
 OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
@@ -230,6 +233,7 @@ main{padding-left:max(0px,env(safe-area-inset-left));padding-right:max(0px,env(s
 <button id="submit" type="submit">🎬 Generate Final Video</button><div class="wizard-nav"><button type="button" class="back back-step" data-back="1">← Back to Voice</button></div></section>
 </form></div>
 <div id="result" class="panel hidden"><div id="loadingPercent" class="loading-percent">0%</div><div class="loading-track"><div id="loadingBar" class="loading-bar" style="width:0%"></div></div><div id="status" class="status" aria-live="polite"></div><div id="links"></div></div>
+<div id="savedVideos" class="panel"><h2>📁 သိမ်းထားသော Final Videos</h2><p class="muted small">Reload လုပ်ပြီးနောက် အရင်ထုတ်ထားတဲ့ Video တွေကို ဒီမှာ ပြန်ဖွင့်နိုင်ပါတယ်။</p><div id="savedVideosList">သိမ်းထားသော Video များကို စစ်ဆေးနေသည်…</div><p id="storageNote" class="muted small"></p></div>
 <p class="muted small">Gemini 3.8 Flash · ကိုယ်အသုံးပြုခွင့်ရှိသော ဗီဒီယိုကိုသာ အသုံးပြုပါ။</p>
 </main>
 <script>
@@ -299,6 +303,27 @@ if(data.status==='error'){statusBox.textContent='Error: '+data.message;btn.disab
 }catch(err){statusBox.textContent='အခြေအနေစစ်ရာတွင် ပြဿနာ: '+err.message;btn.disabled=false;}}
 
 window.addEventListener('resize',()=>{if(previewVideo.videoWidth&&previewVideo.videoHeight){const ratio=previewVideo.videoWidth/previewVideo.videoHeight,livePreview=document.getElementById('preview');livePreview.style.width='min(100%, '+Math.round(window.innerHeight*0.64*ratio)+'px)';livePreview.style.maxHeight=Math.round(window.innerHeight*0.64)+'px';}});
+
+async function loadSavedVideos(){
+ const list=document.getElementById('savedVideosList'),note=document.getElementById('storageNote');
+ try{
+  const res=await fetch('/api/jobs',{cache:'no-store'}),data=await res.json();
+  if(!res.ok)throw new Error(data.error||'စာရင်းမရပါ');
+  const jobs=data.jobs||[];
+  if(!jobs.length){list.textContent='သိမ်းထားသော Final Video မရှိသေးပါ။';}
+  else{
+   list.innerHTML=jobs.map(job=>'<div style="border:1px solid var(--border);border-radius:12px;padding:12px;margin:10px 0;background:var(--panel2)"><strong style="overflow-wrap:anywhere">'+escapeHistoryText(job.title)+'</strong><p class="muted small">ပြီးစီးချိန်: '+(job.finished?new Date(job.finished*1000).toLocaleString():'မသိရသေး')+'</p><div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" data-history-preview="'+job.id+'" style="width:auto;flex:1;margin:0">▶ ပြန်ဖွင့်ရန်</button><a class="download" style="width:auto;flex:1;margin:0" href="'+job.download_url+'">⬇️ MP4 သိမ်းရန်</a></div><div id="history-player-'+job.id+'"></div></div>').join('');
+   list.querySelectorAll('[data-history-preview]').forEach(button=>button.addEventListener('click',()=>{
+    const id=button.getAttribute('data-history-preview'),slot=document.getElementById('history-player-'+id);
+    slot.innerHTML='<video controls playsinline preload="metadata" style="display:block;width:100%;max-height:65vh;aspect-ratio:16/9;object-fit:contain;background:#05070d;border-radius:12px;margin-top:12px" src="/api/jobs/'+id+'/preview"></video>';
+    slot.scrollIntoView({behavior:'smooth',block:'nearest'});
+   }));
+  }
+  note.textContent=data.persistent_storage_configured?'Server storage: persistent disk path detected.':'သတိပြုရန် — Reload သာမက Render restart/redeploy ပြီးနောက်လည်း မပျောက်စေရန် Render တွင် Persistent Disk ကို /var/data တွင် Mount လုပ်ပါ။';
+ }catch(err){list.textContent='သိမ်းထားသော Video စာရင်းကို မဖတ်နိုင်ပါ: '+err.message;}
+}
+function escapeHistoryText(value){return String(value||'Movie Recap').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));}
+window.addEventListener('DOMContentLoaded',loadSavedVideos);
 </script></body></html>
 """
 
@@ -868,6 +893,33 @@ def create_voice_preview():
 @app.get("/health")
 def health():
     return jsonify({"ok": True, "gemini_model": GEMINI_MODEL})
+
+@app.get("/api/jobs")
+def list_jobs():
+    """List completed videos saved on the server so they can be reopened after a page reload."""
+    jobs = []
+    try:
+        with _db_connect() as connection:
+            rows = connection.execute("SELECT id, payload FROM jobs ORDER BY rowid DESC").fetchall()
+        for job_id, payload in rows:
+            try:
+                job = json.loads(payload)
+            except (TypeError, ValueError):
+                continue
+            path = _get_final_video_path(job_id, job)
+            if job.get("status") == "done" and path and path.is_file():
+                jobs.append({
+                    "id": job_id,
+                    "title": str(job.get("title") or "Movie Recap")[:180],
+                    "created": job.get("created"),
+                    "finished": job.get("finished"),
+                    "size": path.stat().st_size,
+                    "preview_url": "/api/jobs/" + job_id + "/preview",
+                    "download_url": "/api/jobs/" + job_id + "/download",
+                })
+    except (OSError, sqlite3.Error):
+        pass
+    return jsonify({"jobs": jobs, "persistent_storage_configured": bool(os.getenv("MOVIE_RECAP_DATA_DIR") or (os.getenv("RENDER") and Path("/var/data").is_dir()))})
 
 @app.post("/api/jobs")
 def create_job():
