@@ -1087,7 +1087,7 @@ def render_video(video_path, voice_path, output_path, options, music_path=None, 
     profile = {"preset": "ultrafast", "crf": "28", "threads": "0", "audio_bitrate": "128k"}
     command += ["-filter_complex",";".join(graph),"-map","[vout]","-map","[aout]",
                 "-t", f"{output_duration:.3f}", "-c:v","libx264","-preset",profile["preset"],"-crf",profile["crf"],
-                "-threads",profile["threads"],"-filter_complex_threads","2","-c:a","aac","-b:a",profile["audio_bitrate"],"-ar","44100","-map_metadata","-1",
+                "-threads",profile["threads"],"-filter_complex_threads","2","-c:a","aac","-b:a",profile["audio_bitrate"],"-ar","44100","-pix_fmt","yuv420p","-video_track_timescale","90000","-map_metadata","-1",
                 "-movflags","+faststart",str(output_path)]
     # Stream FFmpeg's real encoding progress so the UI percentage advances during rendering.
     command[-1:-1] = ["-loglevel", "error", "-progress", "pipe:1", "-nostats"]
@@ -1571,6 +1571,8 @@ def preview_job(job_id):
         abort(404)
     response = send_file(path, as_attachment=False, download_name="movie_recap.mp4", mimetype="video/mp4", conditional=True)
     response.headers["Accept-Ranges"] = "bytes"
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
     return response
 
 @app.get("/api/jobs/<job_id>/srt")
