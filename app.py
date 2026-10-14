@@ -703,7 +703,7 @@ def render_video(video_path, voice_path, srt_path, output_path, options, music_p
         fail("Video သို့မဟုတ် AI Voice duration မမှန်ပါ။")
     video_tempo_factor = target_voice_duration / source_video_duration
 
-    base_filters = [f"setpts=PTS*{video_tempo_factor:.10f}"]
+    base_filters = [f"setpts=(PTS-STARTPTS)*{video_tempo_factor:.10f}"]
     if options.get("mirror"):
         base_filters.append("hflip")
     if options.get("auto_effect", True):
@@ -772,7 +772,7 @@ def render_video(video_path, voice_path, srt_path, output_path, options, music_p
     except (TypeError, ValueError):
         fail("AI Voice timeline duration ကို မဖတ်နိုင်ပါ။")
     command += ["-filter_complex",";".join(graph),"-map","[vout]","-map","[aout]",
-                "-t", f"{voice_duration:.3f}", "-shortest","-c:v","libx264","-preset","ultrafast","-tune","zerolatency","-crf","30",
+                "-t", f"{voice_duration:.3f}", "-c:v","libx264","-preset","ultrafast","-tune","zerolatency","-crf","30",
                 "-threads","2","-filter_complex_threads","2","-c:a","aac","-b:a","128k","-ar","44100","-map_metadata","-1",
                 "-movflags","+faststart",str(output_path)]
     run_command(command, timeout=900)
