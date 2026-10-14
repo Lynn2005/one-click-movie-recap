@@ -840,7 +840,7 @@ def _gemini_tts_chunk(part, api_key, voice, speed):
     raise RuntimeError(last_error or "Gemini TTS မှ အသံမရပါ။")
 
 
-def _split_tts_chunks(text, max_chars=1200):
+def _split_tts_chunks(text, max_chars=220):
     """Group complete sentences into moderate-size chunks without dropping text."""
     sentences = [part.strip() for part in re.split(r"(?<=[.!?။])\s*|\n+", text) if part.strip()]
     if not sentences:
