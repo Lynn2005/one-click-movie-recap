@@ -1183,6 +1183,8 @@ def job_status(job_id):
 def download_job(job_id):
     with JOBS_LOCK:
         job = dict(JOBS.get(job_id) or {})
+    if not job:
+        job = _r2_get_job(job_id) or {}
     if job and job.get("status") != "done":
         abort(404)
     path = _get_final_video_path(job_id, job)
@@ -1198,6 +1200,8 @@ def download_job(job_id):
 def preview_job(job_id):
     with JOBS_LOCK:
         job = dict(JOBS.get(job_id) or {})
+    if not job:
+        job = _r2_get_job(job_id) or {}
     if job and job.get("status") != "done":
         abort(404)
     path = _get_final_video_path(job_id, job)
