@@ -293,7 +293,7 @@ document.getElementById('clearKeys').addEventListener('click',()=>{try{localStor
 loadSavedKeys();
 form.addEventListener('submit',async(e)=>{e.preventDefault();const geminiKey=geminiInput.value.trim(),groqKey=groqInput.value.trim(),videoFile=document.getElementById('videoFile').files[0],videoUrl=document.getElementById('url').value.trim();const recapScript=document.getElementById('recapScript')?.value.trim()||'';if(!recapScript&&(!geminiKey||!groqKey)){result.classList.remove('hidden');statusBox.textContent='Auto Recap အတွက် API Key Settings မှာ Gemini နဲ့ Groq Key နှစ်ခုလုံးထည့်ပြီး Save Keys ကိုနှိပ်ပါ။ ကိုယ်ပိုင် Script သုံးလျှင် API Key မလိုပါ။';return;}if((!videoUrl&&!videoFile)||(videoUrl&&videoFile)){result.classList.remove('hidden');statusBox.textContent='Video URL သို့မဟုတ် Upload Video တစ်ခုကိုပဲ ရွေးပါ။';return;}btn.disabled=true;result.classList.remove('hidden');links.innerHTML='';setProgress(0);statusBox.textContent='';
 try{const body=new FormData();const options={voice:document.getElementById('voice').value,voice_speed:document.getElementById('voiceSpeed').value,subtitle_pace:document.getElementById('subtitlePace').value,auto_effect:document.getElementById('autoEffect').checked,auto_blur_subtitles:document.getElementById('autoBlurSubtitles').checked,mirror:document.getElementById('mirror').checked,overlay_text:''};body.append('url',videoFile?'':videoUrl);body.append('language',document.getElementById('language').value);body.append('gemini_api_key',geminiKey);body.append('groq_api_key',groqKey);Object.entries(options).forEach(([k,v])=>body.append(k,String(v)));if(videoFile)body.append('video',videoFile);body.append('recap_script',document.getElementById('recapScript')?.value.trim()||'');const res=await fetch('/api/jobs',{method:'POST',body});const data=await res.json();if(!res.ok)throw new Error(data.error||'စတင်၍မရပါ');poll(data.id);}catch(err){statusBox.textContent='အမှား: '+err.message;btn.disabled=false;}});
-async function poll(id){try{const res=await fetch('/api/jobs/'+id);const data=await res.json();if(!res.ok){if(res.status===404){statusBox.textContent='အရင် Job ကို server မှာ မတွေ့တော့ပါ။ Render restart/redeploy ဖြစ်ခဲ့နိုင်ပါတယ်။ Video ရွေးထားဆဲဆိုရင် Generate Final Video ကို ထပ်နှိပ်ပြီး Job အသစ်စတင်ပါ။';links.innerHTML='';btn.disabled=false;showStep(3);return;}throw new Error(data.error||'အခြေအနေမရပါ');}setProgress(data.progress??(data.status==='done'?100:0));statusBox.textContent='';
+async function poll(id){try{const res=await fetch('/api/jobs/'+id);const data=await res.json();if(!res.ok){if(res.status===404){statusBox.textContent='အရင် Job ကို server မှာ မတွေ့တော့ပါ။ Render restart/redeploy ဖြစ်ခဲ့နိုင်ပါတယ်။ Video ရွေးထားဆဲဆိုရင် Generate Final Video ကို ထပ်နှိပ်ပြီး Job အသစ်စတင်ပါ။';links.innerHTML='';btn.disabled=false;showStep(3);return;}throw new Error(data.error||'အခြေအနေမရပါ');}setProgress(data.progress??(data.status==='done'?100:0));statusBox.textContent=data.message|| (data.status==='queued'?'အလုပ်တန်းစီနေသည်…':data.status==='running'?'လုပ်ဆောင်နေသည်…':'');
 if(data.status==='done'){setProgress(100);links.innerHTML='<button type="button" id="finalBackBtn" class="back" style="width:100%;margin-bottom:12px">← နောက်သို့ — Voice ပြန်သွားရန်</button><h3>🎬 Final Video Preview</h3><video id="finalVideoPreview" controls playsinline preload="metadata" style="display:block;width:100%;max-height:72vh;aspect-ratio:16/9;object-fit:contain;background:#05070d;border:1px solid #31435e;border-radius:14px;margin:10px 0" src="/api/jobs/'+id+'/preview"></video><a class="download" href="/api/jobs/'+id+'/download">⬇️ Final MP4 ဒေါင်းလုဒ်လုပ်ရန်</a>';document.getElementById('finalBackBtn').addEventListener('click',()=>{document.getElementById('jobform').parentElement.style.display='';showStep(1);document.querySelector('.wizard-step[data-step="1"]')?.scrollIntoView({behavior:'smooth',block:'start'});});document.getElementById('jobform').parentElement.style.display='none';document.querySelectorAll('main > p.muted').forEach(el=>el.style.display='none');document.querySelector('#result h2').textContent='🎬 Final Video Preview';btn.disabled=false;showStep(3);statusBox.scrollIntoView({behavior:'smooth',block:'center'});return;}
 if(data.status==='error'){statusBox.textContent='Error: '+data.message;btn.disabled=false;return;}setTimeout(()=>poll(id),3000);
 }catch(err){statusBox.textContent='အခြေအနေစစ်ရာတွင် ပြဿနာ: '+err.message;btn.disabled=false;}}
@@ -972,14 +972,8 @@ def create_job():
 
 @app.get("/api/jobs/<job_id>")
 def job_status(job_id):
-    # In-memory state is process-local. Recover it from SQLite when requests
-    # land on another worker/process, then return a clear restart state if needed.
-    with JOBS_LOCK:
-        job = JOBS.get(job_id)
-        if job:
-            safe = {k: v for k, v in job.items() if k in ("status", "message", "progress", "created", "finished")}
-            return jsonify(safe)
-
+    # Always read the shared SQLite state first: Render may serve polling requests
+    # from a different worker than the one running the background thread.
     recovered = None
     try:
         with _db_connect() as connection:
@@ -990,17 +984,29 @@ def job_status(job_id):
         recovered = None
 
     if recovered:
-        # A finished artifact is authoritative even if this worker has stale memory.
         final_path = _get_final_video_path(job_id, recovered)
         if final_path and final_path.is_file():
             recovered.update(status="done", progress=100, message="ပြီးပါပြီ။ Final Video ကို ကြည့်ရှု/ဒေါင်းလုဒ်လုပ်နိုင်ပါပြီ။", finished=recovered.get("finished") or time.time())
         elif recovered.get("status") in ("queued", "running"):
-            recovered.update(status="error", message="Server process ပြန်စတင်သွားသောကြောင့် လုပ်ဆောင်နေဆဲ Job ကို ဆက်မလုပ်နိုင်တော့ပါ။ Video ကို ပြန်တင်ပြီး Generate Final Video ကို ထပ်နှိပ်ပါ။", finished=time.time())
+            # If this worker's in-memory job is newer, don't mistake another worker's
+            # queued snapshot for a restart. SQLite is the shared progress source.
+            with JOBS_LOCK:
+                local_job = JOBS.get(job_id)
+            if local_job and local_job.get("status") in ("running", "done", "error"):
+                recovered = local_job
+            else:
+                recovered.update(status="error", message="Server process ပြန်စတင်သွားသောကြောင့် လုပ်ဆောင်နေဆဲ Job ကို ဆက်မလုပ်နိုင်တော့ပါ။ Video ကို ပြန်တင်ပြီး Generate Final Video ကို ထပ်နှိပ်ပါ။", finished=time.time())
         with JOBS_LOCK:
             JOBS[job_id] = recovered
             _save_job_locked(job_id)
         safe = {k: v for k, v in recovered.items() if k in ("status", "message", "progress", "created", "finished")}
         return jsonify(safe)
+
+    with JOBS_LOCK:
+        job = JOBS.get(job_id)
+        if job:
+            safe = {k: v for k, v in job.items() if k in ("status", "message", "progress", "created", "finished")}
+            return jsonify(safe)
 
     return jsonify({
         "error": "ဒီ Job ID ကို server မှာ မတွေ့တော့ပါ။ Render restart ဖြစ်ပြီး Job data မကျန်တော့နိုင်ပါ။ Video ကို ပြန်ရွေးပြီး Generate Final Video ကို ထပ်နှိပ်ပါ။",
