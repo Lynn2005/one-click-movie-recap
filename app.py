@@ -677,7 +677,9 @@ def groq_transcribe(audio_path, api_key):
     transcript = (data.get("text") or "").strip()
     if not transcript:
         fail("ဗီဒီယိုထဲက စကားသံကို မဖော်ထုတ်နိုင်ပါ။")
-    return transcript[:MAX_TRANSCRIPT_CHARS]
+    # Keep the full Whisper transcript. make_recap() splits long transcripts into
+    # sequential chunks; truncating here silently dropped the end of longer videos.
+    return transcript
 
 def make_recap(transcript, language, api_key):
     api_key = (api_key or "").strip()
@@ -1009,10 +1011,10 @@ def render_video(video_path, voice_path, output_path, options, music_path=None, 
     else:
         graph.append("[1:a:0]volume=1,alimiter=limit=0.95[aout]")
 
-    # Use the original video duration as the master timeline. Voice has already
-    # been fitted to this duration; -t prevents accidental output beyond the source timeline.
+    # Use narration duration as the output timeline. This keeps the AI voice at its
+    # natural generated pace instead of stretching a short recap across the whole movie.
     try:
-        voice_duration = max(0.1, source_video_duration)
+        voice_duration = max(0.1, target_voice_duration)
     except (TypeError, ValueError):
         fail("Original Video timeline duration ကို မဖတ်နိုင်ပါ။")
     # Use the fixed fast encoding profile for consistent render speed.
@@ -1175,10 +1177,9 @@ def process_job(job_id, url, language, workdir, gemini_api_key, groq_api_key, op
         boundaries_file = workdir / "voice_boundaries.json"
         synthesize_voice(script, language, voice, options.get("voice", "my-MM-NilarNeural"), options.get("voice_speed", 120), boundaries_file)
 
-        # Keep the original video timeline: fit the generated narration to the source duration.
-        # This keeps the source footage at its original speed and makes the subtitle timeline
-        # use the same total duration as the original video.
-        fit_voice_to_video(video, voice)
+        # Keep the AI narration at its generated speaking rate. Do not stretch it to
+        # the full source-movie duration: recap scripts are intentionally shorter than
+        # the source, and time-stretching made the Burmese voice unnaturally slow.
         update_job(job_id, progress=70)
 
         update_job(job_id, progress=75)
