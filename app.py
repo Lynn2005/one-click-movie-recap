@@ -899,10 +899,9 @@ def render_video(video_path, voice_path, output_path, options, music_path=None, 
 
     overlay = (options.get("overlay_text") or "").strip()
 
-    # Use the full source video and fit its playback timeline to the final AI voice.
-    # Faster narration speeds the video up; longer narration slows the video down.
-    # This keeps video, voice, and subtitles ending together instead of cutting the
-    # source video off at the narration endpoint.
+    # Preserve the original video playback speed and timeline.
+    # The narration is fitted to the source duration before rendering, so video,
+    # narration, and generated subtitles share the same endpoint without speeding footage up.
     video_duration_text = run_command(["ffprobe", "-v", "error", "-show_entries", "format=duration",
                                        "-of", "default=noprint_wrappers=1:nokey=1", str(video_path)], timeout=30)
     voice_duration_text = run_command(["ffprobe", "-v", "error", "-show_entries", "format=duration",
@@ -914,9 +913,9 @@ def render_video(video_path, voice_path, output_path, options, music_path=None, 
         fail("Video/AI Voice duration ကို မဖတ်နိုင်ပါ။")
     if source_video_duration <= 0 or target_voice_duration <= 0:
         fail("Video သို့မဟုတ် AI Voice duration မမှန်ပါ။")
-    video_tempo_factor = target_voice_duration / source_video_duration
-
-    base_filters = [f"setpts=(PTS-STARTPTS)*{video_tempo_factor:.10f}"]
+    # The source video must remain at its original speed. If the voice and video
+    # differ by a small amount after encoding, the output is trimmed/padded at the end.
+    base_filters = ["setpts=PTS-STARTPTS"]
     if options.get("mirror"):
         base_filters.append("hflip")
     if options.get("auto_effect", True):
@@ -954,14 +953,12 @@ def render_video(video_path, voice_path, output_path, options, music_path=None, 
     else:
         graph.append("[1:a:0]volume=1,alimiter=limit=0.95[aout]")
 
-    # Use the AI voice duration as the master timeline. The video is trimmed to
-    # the same endpoint so the exported MP4, narration, and generated subtitles end together.
-    voice_duration_text = run_command(["ffprobe", "-v", "error", "-show_entries", "format=duration",
-                                       "-of", "default=noprint_wrappers=1:nokey=1", str(voice_path)], timeout=30)
+    # Use the original video duration as the master timeline. Voice has already
+    # been fitted to this duration; -t prevents accidental output beyond the source timeline.
     try:
-        voice_duration = max(0.1, float(voice_duration_text))
+        voice_duration = max(0.1, source_video_duration)
     except (TypeError, ValueError):
-        fail("AI Voice timeline duration ကို မဖတ်နိုင်ပါ။")
+        fail("Original Video timeline duration ကို မဖတ်နိုင်ပါ။")
     # Use the fixed fast encoding profile for consistent render speed.
     profile = {"preset": "ultrafast", "crf": "28", "threads": "0", "audio_bitrate": "128k"}
     command += ["-filter_complex",";".join(graph),"-map","[vout]","-map","[aout]",
@@ -1085,7 +1082,10 @@ def process_job(job_id, url, language, workdir, gemini_api_key, groq_api_key, op
         update_job(job_id, progress=55)
         synthesize_voice(script, language, voice, options.get("voice", "my-MM-NilarNeural"), options.get("voice_speed", 120))
 
-        # Keep the selected narration pace. Do not stretch narration to the source-video duration.
+        # Keep the original video timeline: fit the generated narration to the source duration.
+        # This keeps the source footage at its original speed and makes the subtitle timeline
+        # use the same total duration as the original video.
+        fit_voice_to_video(video, voice)
         update_job(job_id, progress=70)
 
         update_job(job_id, progress=75)
