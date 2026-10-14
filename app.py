@@ -1072,20 +1072,21 @@ def render_video(video_path, voice_path, output_path, options, music_path=None, 
 
     if music_index is not None:
         volume=max(0,min(100,int(options.get("music_volume",20))))/100
-        graph += ["[1:a:0]volume=1[voice]",f"[{music_index}:a:0]volume={volume}[music]","[voice][music]amix=inputs=2:duration=first:dropout_transition=0,alimiter=limit=0.95[aout]"]
+        graph += [f"[1:a:0]apad,atrim=duration={source_video_duration:.3f},volume=1[voice]",f"[{music_index}:a:0]volume={volume}[music]","[voice][music]amix=inputs=2:duration=first:dropout_transition=0,alimiter=limit=0.95[aout]"]
     else:
-        graph.append("[1:a:0]volume=1,alimiter=limit=0.95[aout]")
+        graph.append(f"[1:a:0]apad,atrim=duration={source_video_duration:.3f},volume=1,alimiter=limit=0.95[aout]")
 
-    # Use narration duration as the output timeline. This keeps the AI voice at its
-    # natural generated pace instead of stretching a short recap across the whole movie.
+    # Keep the final MP4 on the full source-video timeline. Do not trim the video
+    # down to a short narration (which made the final preview appear to be 0:00/very short).
+    # Pad narration with silence after it ends; never stretch or slow down the AI voice.
     try:
-        voice_duration = max(0.1, target_voice_duration)
+        output_duration = max(0.1, source_video_duration)
     except (TypeError, ValueError):
         fail("Original Video timeline duration ကို မဖတ်နိုင်ပါ။")
     # Use the fixed fast encoding profile for consistent render speed.
     profile = {"preset": "ultrafast", "crf": "28", "threads": "0", "audio_bitrate": "128k"}
     command += ["-filter_complex",";".join(graph),"-map","[vout]","-map","[aout]",
-                "-t", f"{voice_duration:.3f}", "-c:v","libx264","-preset",profile["preset"],"-crf",profile["crf"],
+                "-t", f"{output_duration:.3f}", "-c:v","libx264","-preset",profile["preset"],"-crf",profile["crf"],
                 "-threads",profile["threads"],"-filter_complex_threads","2","-c:a","aac","-b:a",profile["audio_bitrate"],"-ar","44100","-map_metadata","-1",
                 "-movflags","+faststart",str(output_path)]
     # Stream FFmpeg's real encoding progress so the UI percentage advances during rendering.
@@ -1123,6 +1124,16 @@ def render_video(video_path, voice_path, output_path, options, music_path=None, 
     audio_check = run_command(["ffprobe","-v","error","-select_streams","a:0","-show_entries","stream=codec_name","-of","default=noprint_wrappers=1:nokey=1",str(output_path)], timeout=30).strip()
     if not audio_check:
         fail("Final MP4 ထဲမှာ Audio Stream မပါပါ။")
+    final_duration_text = run_command(["ffprobe", "-v", "error", "-show_entries", "format=duration",
+                                       "-of", "default=noprint_wrappers=1:nokey=1", str(output_path)], timeout=30).strip()
+    try:
+        final_duration = float(final_duration_text)
+    except (TypeError, ValueError):
+        fail("Final MP4 ရဲ့ Duration Metadata ကို ဖတ်မရပါ။ FFmpeg output ကို ပြန်စစ်ပါ။")
+    if final_duration <= 0.1:
+        fail("Final MP4 ရဲ့ Duration 0 စက္ကန့် ဖြစ်နေသည်။ Video ကို ပြန် Render လုပ်ပါ။")
+    if abs(final_duration - source_video_duration) > max(2.0, source_video_duration * 0.05):
+        fail("Final MP4 အရှည် မမှန်ပါ။ မူရင်း Video %.1f sec၊ Final %.1f sec ဖြစ်နေသည်။" % (source_video_duration, final_duration))
 
 
 def make_srt(script, voice_path, srt_path, options=None, boundaries_path=None):
