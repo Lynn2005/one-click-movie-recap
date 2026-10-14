@@ -398,7 +398,7 @@ document.getElementById('saveKeys').addEventListener('click',()=>{const g=gemini
 document.getElementById('clearKeys').addEventListener('click',()=>{try{localStorage.removeItem('oneclick_gemini_key');localStorage.removeItem('oneclick_groq_key');}catch(e){}geminiInput.value='';groqInput.value='';keyStatus.textContent='Browser ထဲက Saved Keys ကို ဖျက်ပြီးပါပြီ။';});
 loadSavedKeys();
 async function submitMultipleVideos(files,geminiKey,groqKey){
- const result=document.getElementById('result'),statusBox=document.getElementById('status'),links=document.getElementById('links'),btn=document.getElementById('generateBtn');
+ const result=document.getElementById('result'),statusBox=document.getElementById('status'),links=document.getElementById('links'),btn=document.getElementById('submit');
  const recapScript=document.getElementById('recapScript')?.value.trim()||'';
  const options={voice:document.getElementById('voice').value,voice_speed:document.getElementById('voiceSpeed').value,subtitle_pace:document.getElementById('subtitlePace').value,auto_effect:document.getElementById('autoEffect').checked,auto_blur_subtitles:document.getElementById('autoBlurSubtitles').checked,mirror:document.getElementById('mirror').checked,overlay_text:''};
  const jobs=[];
