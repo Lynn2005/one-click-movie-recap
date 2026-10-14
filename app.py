@@ -350,7 +350,9 @@ function showDashboard(){
 }
 function showRecapForm(){
  dashboardPanel.classList.add('hidden');
- document.getElementById('jobform').parentElement.classList.remove('hidden');
+ const formPanel=document.getElementById('jobform').parentElement;
+ formPanel.style.display='';
+ formPanel.classList.remove('hidden');
  document.getElementById('result').classList.add('hidden');
  document.getElementById('jobform').parentElement.scrollIntoView({behavior:'smooth',block:'start'});
 }
