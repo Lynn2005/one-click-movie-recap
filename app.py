@@ -687,7 +687,7 @@ def render_video(video_path, voice_path, output_path, options, music_path=None, 
                 "-threads",profile["threads"],"-filter_complex_threads","2","-c:a","aac","-b:a",profile["audio_bitrate"],"-ar","44100","-map_metadata","-1",
                 "-movflags","+faststart",str(output_path)]
     # Stream FFmpeg's real encoding progress so the UI percentage advances during rendering.
-    command += ["-progress", "pipe:1", "-nostats"]
+    command[-1:-1] = ["-loglevel", "error", "-progress", "pipe:1", "-nostats"]
     try:
         proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                 text=True, bufsize=1)
