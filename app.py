@@ -243,7 +243,7 @@ a{color:#9fbaff}
 <input id="videoFile" name="video" type="file" accept=".mp4,.mov,.webm,.m4v,video/mp4,video/quicktime,video/webm">
 <div class="wizard-nav"><button type="button" class="next-step" data-next="1">Next → Voice</button></div></section>
 <section class="wizard-step" data-step="1"><div class="step-head"><span class="step-number">2</span><div><div class="step-title">Voice & Language</div><div class="step-desc">Recap ဘာသာနဲ့ AI အသံ ရွေးပါ</div></div></div>
-<div class="option-grid"><div><label for="language">Recap ဘာသာ</label><select id="language" name="language"><option value="my">မြန်မာ</option><option value="en">English</option></select></div><div><label for="voice">Voice</label><select id="voice" name="voice"><option value="my-MM-NilarNeural">မြန်မာ Nilar (မိန်းမသံ)</option><option value="my-MM-ThihaNeural">မြန်မာ Thiha (ယောက်ျားသံ)</option><option value="en-US-AriaNeural">English Aria</option><option value="en-US-GuyNeural">English Guy</option><option value="en-GB-SoniaNeural">English Sonia</option></select></div></div>
+<div class="option-grid"><div><label for="language">Recap ဘာသာ</label><select id="language" name="language"><option value="my">မြန်မာ</option><option value="en">English</option></select></div><div><label for="voice">Voice</label><select id="voice" name="voice"><option value="my-MM-NilarNeural">မြန်မာ Nilar (မိန်းမသံ)</option><option value="my-MM-ThihaNeural">မြန်မာ Thiha (ယောက်ျားသံ)</option><option value="en-US-AriaNeural">English Aria</option><option value="en-US-GuyNeural">English Guy</option><option value="en-GB-SoniaNeural">English Sonia</option></select></div><div><label for="subtitlePace">SRT စာတန်းပြောနှုန်း (၃ စက္ကန့်ခန့်)</label><select id="subtitlePace" name="subtitle_pace"><option value="slow">ဖြည်းဖြည်း၊ ရှင်းရှင်း — ၁၀–၁၅ လုံး</option><option value="normal" selected>ပုံမှန် Recap — ၁၅–၂၅ လုံး</option><option value="fast">မြန်မြန်ပြော — ၂၅–၃၅ လုံး</option></select><p class="muted small">မြန်မာစာမှာ စကားလုံးခွဲခြားမှုမတူနိုင်တာကြောင့် syllable/စာလုံးယူနစ်ကို ခန့်မှန်းပြီး SRT အချိန်ကို Voice duration နဲ့ညှိပေးမယ်။</p></div></div>
 <p class="muted small">AI Voice ကို တင်ထားတဲ့ Video အရှည်နဲ့ အလိုအလျောက် အချိန်ညှိပေးပါမယ်။</p>
 <div style="margin-top:14px;padding:14px;border:1px solid var(--border);border-radius:13px;background:var(--panel2)">
 <label for="recapScript">WevoLabs သုံးမယ်ဆို Recap Script (မဖြစ်မနေ)</label>
@@ -341,13 +341,13 @@ async function loadVideoLibrary(){libraryCount.textContent='Library ကို �
 document.getElementById('refreshLibrary').addEventListener('click',loadVideoLibrary);
 const batchFilesInput=document.getElementById('batchFiles'),batchStart=document.getElementById('batchStart'),batchResults=document.getElementById('batchResults'),batchSelection=document.getElementById('batchSelection');
 batchFilesInput.addEventListener('change',()=>{const files=Array.from(batchFilesInput.files||[]);batchSelection.textContent=files.length?files.length+' movie(s) selected · '+files.map(f=>f.name).join(', '):'Video မရွေးရသေးပါ။ တစ်ကားလျှင် 80 MB အောက်၊ 10 မိနစ်အောက် ဖြစ်ရပါမည်။';});
-function batchOptions(){return {voice:document.getElementById('voice').value,auto_effect:document.getElementById('autoEffect').checked,blur:document.getElementById('blur').value,blur_x:document.getElementById('blurX').value,blur_y:document.getElementById('blurY').value,blur_w:document.getElementById('blurW').value,blur_h:document.getElementById('blurH').value,mirror:document.getElementById('mirror').checked,sub_size:document.getElementById('subSize').value,sub_color:document.getElementById('subColor').value,sub_position:document.getElementById('subPosition').value,sub_x:document.getElementById('subX').value,sub_y:document.getElementById('subY').value,sub_weight:document.getElementById('subWeight').value,sub_outline:document.getElementById('subOutline').value,logo_text:document.getElementById('logoText').value,logo_x:document.getElementById('logoX').value,logo_y:document.getElementById('logoY').value,logo_w:document.getElementById('logoW').value,logo_opacity:document.getElementById('logoOpacity').value,overlay_text:document.getElementById('overlayText').value,subtitles_on:document.getElementById('subtitlesOn').checked};}
+function batchOptions(){return {voice:document.getElementById('voice').value,subtitle_pace:document.getElementById('subtitlePace').value,auto_effect:document.getElementById('autoEffect').checked,blur:document.getElementById('blur').value,blur_x:document.getElementById('blurX').value,blur_y:document.getElementById('blurY').value,blur_w:document.getElementById('blurW').value,blur_h:document.getElementById('blurH').value,mirror:document.getElementById('mirror').checked,sub_size:document.getElementById('subSize').value,sub_color:document.getElementById('subColor').value,sub_position:document.getElementById('subPosition').value,sub_x:document.getElementById('subX').value,sub_y:document.getElementById('subY').value,sub_weight:document.getElementById('subWeight').value,sub_outline:document.getElementById('subOutline').value,logo_text:document.getElementById('logoText').value,logo_x:document.getElementById('logoX').value,logo_y:document.getElementById('logoY').value,logo_w:document.getElementById('logoW').value,logo_opacity:document.getElementById('logoOpacity').value,overlay_text:document.getElementById('overlayText').value,subtitles_on:document.getElementById('subtitlesOn').checked};}
 function makeBatchCard(file,index){const card=document.createElement('div');card.className='batch-item';const title=document.createElement('h3');title.textContent=(index+1)+'. '+file.name;const state=document.createElement('div');state.className='batch-state';state.textContent='စောင့်ဆိုင်းနေသည်…';const progress=document.createElement('div');progress.className='batch-progress';const fill=document.createElement('span');progress.appendChild(fill);const result=document.createElement('div');card.append(title,state,progress,result);batchResults.appendChild(card);return {card,state,fill,result};}
 function wait(ms){return new Promise(resolve=>setTimeout(resolve,ms));}
 async function waitForBatchJob(id,card){for(let tries=0;tries<1200;tries++){const response=await fetch('/api/jobs/'+id);const data=await response.json();if(!response.ok)throw new Error(data.error||'Job status မရပါ');card.state.textContent=data.message||data.status;card.fill.style.width=data.status==='done'?'100%':data.status==='error'?'100%':'65%';if(data.status==='done')return data;if(data.status==='error')throw new Error(data.message||'ဒီ video မအောင်မြင်ပါ');await wait(3000);}throw new Error('အချိန်ကြာလွန်းနေသည်။ Job status ကို ပြန်စစ်ပါ။');}
 batchStart.addEventListener('click',async()=>{const files=Array.from(batchFilesInput.files||[]);if(!files.length){alert('Movie Video အနည်းဆုံးတစ်ခု ရွေးပါ။');return;}if(files.length>5){alert('တစ်ခါလျှင် အများဆုံး 5 ကားသာ ရွေးပါ။');return;}const g=geminiInput.value.trim(),q=groqInput.value.trim();if(!g||!q){settingsWrap.classList.remove('hidden');keyStatus.textContent='Batch Recap အတွက် Gemini နဲ့ Groq API Key နှစ်ခုလုံး လိုပါတယ်။';return;}const allowed=/\.(mp4|mov|webm|m4v)$/i;for(const file of files){if(!allowed.test(file.name)){alert('MP4, MOV, WEBM, M4V ဖိုင်များကိုသာ သုံးပါ: '+file.name);return;}if(file.size>80*1024*1024){alert('80 MB ထက်ကြီးနေသောဖိုင်: '+file.name);return;}if(file.size===0){alert('ဖိုင်အလွတ်ဖြစ်နေသည်: '+file.name);return;}}batchStart.disabled=true;batchFilesInput.disabled=true;batchResults.classList.remove('hidden');batchResults.replaceChildren();const cards=files.map(makeBatchCard);let completed=0,failed=0;for(let i=0;i<files.length;i++){const file=files[i],card=cards[i];card.state.textContent='Upload & Queue…';try{const body=new FormData();body.append('url','');body.append('video',file);body.append('language',document.getElementById('language').value);body.append('gemini_api_key',g);body.append('groq_api_key',q);Object.entries(batchOptions()).forEach(([k,v])=>body.append(k,String(v)));const logo=document.getElementById('logoImage').files[0];if(logo)body.append('logo_image',logo);const response=await fetch('/api/jobs',{method:'POST',body});const created=await response.json();if(!response.ok)throw new Error(created.error||'Job စတင်မရပါ');card.state.textContent='Queued…';const done=await waitForBatchJob(created.id,card);const video=document.createElement('video');video.controls=true;video.playsInline=true;video.preload='metadata';video.src='/api/jobs/'+created.id+'/preview';video.style.cssText='display:block;width:100%;max-height:320px;margin-top:10px;background:#05070d;border-radius:9px';const link=document.createElement('a');link.className='download';link.href='/api/jobs/'+created.id+'/download';link.textContent='⬇️ '+file.name.replace(/\.[^.]+$/,'')+' — Final MP4';link.download='';card.result.append(video,link);card.state.textContent='ပြီးပါပြီ ✓';completed++;}catch(err){card.state.textContent='မအောင်မြင်ပါ: '+err.message;card.fill.style.width='100%';card.fill.style.background='#e06a78';failed++;} }const summary=document.createElement('p');summary.className='small';summary.textContent='Batch ပြီးပါပြီ — '+completed+' အောင်မြင်၊ '+failed+' မအောင်မြင်။';batchResults.prepend(summary);batchStart.disabled=false;batchFilesInput.disabled=false;loadVideoLibrary();});
 form.addEventListener('submit',async(e)=>{e.preventDefault();const geminiKey=geminiInput.value.trim(),groqKey=groqInput.value.trim(),videoFile=document.getElementById('videoFile').files[0],videoUrl=document.getElementById('url').value.trim();const recapScript=document.getElementById('recapScript').value.trim();if(!recapScript&&(!geminiKey||!groqKey)){result.classList.remove('hidden');statusBox.textContent='Auto Recap အတွက် API Key Settings မှာ Gemini နဲ့ Groq Key နှစ်ခုလုံးထည့်ပြီး Save Keys ကိုနှိပ်ပါ။ WevoLabs အသံနဲ့ ကိုယ်ပိုင် Script သုံးလျှင် Key မလိုပါ။';return;}if((!videoUrl&&!videoFile)||(videoUrl&&videoFile)){result.classList.remove('hidden');statusBox.textContent='Video URL သို့မဟုတ် Upload Video တစ်ခုကိုပဲ ရွေးပါ။';return;}btn.disabled=true;result.classList.remove('hidden');links.innerHTML='';statusBox.textContent='အလုပ်စတင်နေသည်…';
-try{const body=new FormData();const options={trim_start:document.getElementById("trimStart").value,trim_end:document.getElementById("trimEnd").value,voice:document.getElementById('voice').value,auto_effect:document.getElementById('autoEffect').checked,blur:document.getElementById('blur').value,blur_x:document.getElementById('blurX').value,blur_y:document.getElementById('blurY').value,blur_w:document.getElementById('blurW').value,blur_h:document.getElementById('blurH').value,mirror:document.getElementById('mirror').checked,sub_size:document.getElementById('subSize').value,sub_color:document.getElementById('subColor').value,sub_position:document.getElementById('subPosition').value,sub_x:document.getElementById('subX').value,sub_y:document.getElementById('subY').value,sub_weight:document.getElementById('subWeight').value,sub_outline:document.getElementById('subOutline').value,logo_text:document.getElementById('logoText').value,logo_x:document.getElementById('logoX').value,logo_y:document.getElementById('logoY').value,logo_w:document.getElementById('logoW').value,logo_opacity:document.getElementById('logoOpacity').value,overlay_text:document.getElementById('overlayText').value,subtitles_on:document.getElementById('subtitlesOn').checked,};body.append('url',videoFile?'':videoUrl);body.append('language',document.getElementById('language').value);body.append('gemini_api_key',geminiKey);body.append('groq_api_key',groqKey);Object.entries(options).forEach(([k,v])=>body.append(k,String(v)));if(videoFile)body.append('video',videoFile);body.append('recap_script',document.getElementById('recapScript').value.trim());const wevoFile=document.getElementById('wevolabsVoice').files[0];if(wevoFile)body.append('wevolabs_voice',wevoFile);const logoFile=document.getElementById('logoImage').files[0];if(logoFile)body.append('logo_image',logoFile);const res=await fetch('/api/jobs',{method:'POST',body});const data=await res.json();if(!res.ok)throw new Error(data.error||'စတင်၍မရပါ');poll(data.id);}catch(err){statusBox.textContent='အမှား: '+err.message;btn.disabled=false;}});
+try{const body=new FormData();const options={trim_start:document.getElementById("trimStart").value,trim_end:document.getElementById("trimEnd").value,voice:document.getElementById('voice').value,subtitle_pace:document.getElementById('subtitlePace').value,auto_effect:document.getElementById('autoEffect').checked,blur:document.getElementById('blur').value,blur_x:document.getElementById('blurX').value,blur_y:document.getElementById('blurY').value,blur_w:document.getElementById('blurW').value,blur_h:document.getElementById('blurH').value,mirror:document.getElementById('mirror').checked,sub_size:document.getElementById('subSize').value,sub_color:document.getElementById('subColor').value,sub_position:document.getElementById('subPosition').value,sub_x:document.getElementById('subX').value,sub_y:document.getElementById('subY').value,sub_weight:document.getElementById('subWeight').value,sub_outline:document.getElementById('subOutline').value,logo_text:document.getElementById('logoText').value,logo_x:document.getElementById('logoX').value,logo_y:document.getElementById('logoY').value,logo_w:document.getElementById('logoW').value,logo_opacity:document.getElementById('logoOpacity').value,overlay_text:document.getElementById('overlayText').value,subtitles_on:document.getElementById('subtitlesOn').checked,};body.append('url',videoFile?'':videoUrl);body.append('language',document.getElementById('language').value);body.append('gemini_api_key',geminiKey);body.append('groq_api_key',groqKey);Object.entries(options).forEach(([k,v])=>body.append(k,String(v)));if(videoFile)body.append('video',videoFile);body.append('recap_script',document.getElementById('recapScript').value.trim());const wevoFile=document.getElementById('wevolabsVoice').files[0];if(wevoFile)body.append('wevolabs_voice',wevoFile);const logoFile=document.getElementById('logoImage').files[0];if(logoFile)body.append('logo_image',logoFile);const res=await fetch('/api/jobs',{method:'POST',body});const data=await res.json();if(!res.ok)throw new Error(data.error||'စတင်၍မရပါ');poll(data.id);}catch(err){statusBox.textContent='အမှား: '+err.message;btn.disabled=false;}});
 async function poll(id){try{const res=await fetch('/api/jobs/'+id);const data=await res.json();if(!res.ok){if(res.status===404){statusBox.textContent='အရင် Job ကို server မှာ မတွေ့တော့ပါ။ Render restart/redeploy ဖြစ်ခဲ့နိုင်ပါတယ်။ Video ရွေးထားဆဲဆိုရင် Generate Final Video ကို ထပ်နှိပ်ပြီး Job အသစ်စတင်ပါ။';links.innerHTML='';btn.disabled=false;showStep(3);return;}throw new Error(data.error||'အခြေအနေမရပါ');}statusBox.textContent=data.message||data.status;
 if(data.status==='done'){links.innerHTML='<button type="button" id="finalBackBtn" class="back" style="width:100%;margin-bottom:12px">← နောက်သို့ — Edit Tools ပြန်သွားရန်</button><h3>🎬 Final Video Preview</h3><video id="finalVideoPreview" controls playsinline preload="metadata" style="display:block;width:100%;max-height:72vh;aspect-ratio:16/9;object-fit:contain;background:#05070d;border:1px solid #31435e;border-radius:14px;margin:10px 0" src="/api/jobs/'+id+'/preview"></video><a class="download" href="/api/jobs/'+id+'/download">⬇️ Final MP4 ဒေါင်းလုဒ်လုပ်ရန်</a>';document.getElementById('finalBackBtn').addEventListener('click',()=>{document.getElementById('jobform').parentElement.style.display='';showStep(2);document.getElementById('editTools')?.scrollIntoView({behavior:'smooth',block:'start'});});document.getElementById('jobform').parentElement.style.display='none';document.querySelectorAll('main > p.muted').forEach(el=>el.style.display='none');document.querySelector('#result h2').textContent='🎬 Final Video Preview';btn.disabled=false;showStep(3);statusBox.scrollIntoView({behavior:'smooth',block:'center'});loadVideoLibrary();return;}
 if(data.status==='error'){statusBox.textContent='မအောင်မြင်ပါ: '+data.message;btn.disabled=false;return;}setTimeout(()=>poll(id),3000);
@@ -617,6 +617,54 @@ def fit_voice_to_video(video_path, voice_path):
     fitted.replace(voice_path)
 
 
+def subtitle_units(text):
+    """Approximate reading units: Burmese syllables, or whitespace-delimited words for Latin text."""
+    import unicodedata
+    text = unicodedata.normalize("NFC", clean_myanmar_text(text or ""))
+    myanmar_units = list(re.finditer(r"[\u1000-\u1021\u1023-\u102A\u103F](?:[\u102B-\u103E\u105A-\u105D\u1060-\u1097])*", text))
+    if myanmar_units:
+        return [(m.start(), m.end()) for m in myanmar_units]
+    return [(m.start(), m.end()) for m in re.finditer(r"\S+", text)]
+
+def split_subtitle_cues(text, pace="normal"):
+    """Split recap into readable subtitle cues using the selected approximate 3-second pace."""
+    targets = {"slow": 12, "normal": 20, "fast": 30}
+    target = targets.get(str(pace or "normal").lower(), 20)
+    text = clean_myanmar_text(text or "").strip()
+    if not text:
+        return []
+    # Prefer natural sentence boundaries before subdividing long sentences.
+    sentences = [part.strip() for part in re.split(r"(?<=[.!?။])\s*|\n+", text) if part.strip()]
+    cues = []
+    for sentence in sentences:
+        units = subtitle_units(sentence)
+        if len(units) <= target:
+            cues.append(sentence)
+            continue
+        start = 0
+        while start < len(units):
+            end_index = min(start + target, len(units))
+            if end_index >= len(units):
+                end_pos = len(sentence)
+            else:
+                # Aim for a nearby natural pause after the target, without creating a tiny cue.
+                target_pos = units[end_index - 1][1]
+                search_end = min(len(sentence), units[min(len(units)-1, end_index + 5)][1])
+                pause_candidates = [m.end() for m in re.finditer(r"[\s၊,;:။.!?]", sentence[target_pos:search_end])]
+                end_pos = target_pos + pause_candidates[0] if pause_candidates else target_pos
+                if end_pos <= 0:
+                    end_pos = target_pos
+            chunk = sentence[units[start][0]:end_pos].strip()
+            if not chunk:
+                end_pos = units[end_index - 1][1]
+                chunk = sentence[units[start][0]:end_pos].strip()
+            if chunk:
+                cues.append(chunk)
+            while end_index < len(units) and units[end_index][0] < end_pos:
+                end_index += 1
+            start = max(start + 1, end_index)
+    return cues or [text]
+
 def make_subtitles(script, voice_path, srt_path, video_path=None, options=None):
     import unicodedata
     script = unicodedata.normalize("NFC", clean_myanmar_text(script))
@@ -631,8 +679,8 @@ def make_subtitles(script, voice_path, srt_path, video_path=None, options=None):
         try: width, height = [int(v) for v in dimensions.strip().split("x")[:2]]
         except Exception: pass
     if duration <= 0: fail("Voice audio duration မမှန်ပါ။")
-    chunks = split_sentences(script)
-    weights = [max(1, len(chunk)) for chunk in chunks]
+    chunks = split_subtitle_cues(script, options.get("subtitle_pace", "normal"))
+    weights = [max(1, len(subtitle_units(chunk))) for chunk in chunks]
     total_weight = sum(weights)
     x = round(width * max(5, min(95, int(options.get("sub_x", 50)))) / 100)
     default_y = {"bottom":88,"middle":50,"top":20}.get(options.get("sub_position"),88)
@@ -766,15 +814,16 @@ def render_video(video_path, voice_path, srt_path, output_path, options, music_p
         fail("Final MP4 ထဲမှာ Audio Stream မပါပါ။")
 
 
-def make_srt(script, voice_path, srt_path):
-    """Create SRT timings proportionally to the generated voice duration."""
+def make_srt(script, voice_path, srt_path, options=None):
+    """Create readable SRT cues paced around three seconds and timed to the voice duration."""
+    options = options or {}
     duration_text = run_command(["ffprobe", "-v", "error", "-show_entries", "format=duration",
                                  "-of", "default=noprint_wrappers=1:nokey=1", str(voice_path)], timeout=30)
     duration = float(duration_text)
-    chunks = [chunk.strip() for chunk in split_sentences(clean_myanmar_text(script)) if chunk.strip()]
+    chunks = [chunk.strip() for chunk in split_subtitle_cues(clean_myanmar_text(script), options.get("subtitle_pace", "normal")) if chunk.strip()]
     if duration <= 0 or not chunks:
         fail("SRT ဖိုင်ဖန်တီးရန် Voice duration သို့မဟုတ် Script မမှန်ပါ။")
-    weights = [max(1, len(chunk)) for chunk in chunks]
+    weights = [max(1, len(subtitle_units(chunk))) for chunk in chunks]
     total = sum(weights)
     current = 0.0
     with open(srt_path, "w", encoding="utf-8") as handle:
@@ -889,7 +938,7 @@ def process_job(job_id, url, language, workdir, gemini_api_key, groq_api_key, op
             options["logo_text"] = ""
         make_subtitles(script, voice, subtitles, video, options)
         srt_file = workdir / "recap.srt"
-        make_srt(script, voice, srt_file)
+        make_srt(script, voice, srt_file, options)
 
         update_job(job_id, message="နောက်ဆုံး MP4 ကို တည်ဆောက်နေသည်။ ခဏစောင့်ပါ…")
         render_video(video, voice, subtitles, output, options, music_path, logo_path)
