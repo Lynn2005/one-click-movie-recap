@@ -215,15 +215,15 @@ main{padding-left:max(0px,env(safe-area-inset-left));padding-right:max(0px,env(s
 <div class="option-grid"><div><label for="language">Recap ဘာသာ</label><select id="language" name="language"><option value="my">မြန်မာ</option><option value="en">English</option></select></div><div><label for="voice">Voice</label><select id="voice" name="voice"><option value="my-MM-NilarNeural">မြန်မာ Nilar (မိန်းမသံ)</option><option value="my-MM-ThihaNeural">မြန်မာ Thiha (ယောက်ျားသံ)</option></select></div><div><label for="voiceSpeed">AI Voice ပြောနှုန်း</label><select id="voiceSpeed" name="voice_speed"><option value="100">ပုံမှန် (100%)</option><option value="110">နည်းနည်းမြန် (110%)</option><option value="120" selected>မြန်မြန် (120%)</option><option value="130">အမြန်ဆုံး (130%)</option></select><p class="muted small">Default ကို ၂၀% မြန်အောင်ထားပြီး Voice ကို Video အရှည်အတိုင်း အတင်းမနှေးစေပါ။</p></div><div><label for="subtitlePace">SRT စာတန်းပြောနှုန်း (၃ စက္ကန့်ခန့်)</label><select id="subtitlePace" name="subtitle_pace"><option value="slow">ဖြည်းဖြည်း၊ ရှင်းရှင်း — ၁၀–၁၅ လုံး</option><option value="normal" selected>ပုံမှန် Recap — ၁၅–၂၅ လုံး</option><option value="fast">မြန်မြန်ပြော — ၂၅–၃၅ လုံး</option></select><p class="muted small">မြန်မာစာမှာ စကားလုံးခွဲခြားမှုမတူနိုင်တာကြောင့် syllable/စာလုံးယူနစ်ကို ခန့်မှန်းပြီး SRT အချိန်ကို Voice duration နဲ့ညှိပေးမယ်။</p></div></div>
 <p class="muted small">AI Voice ကို ရွေးထားတဲ့ ပြောနှုန်းအတိုင်း ထုတ်ပေးပြီး Final Video ကို Voice အချိန်နဲ့ ကိုက်ညီအောင် ပြုလုပ်ပါမယ်။</p>
 <div style="margin-top:14px;padding:14px;border:1px solid var(--border);border-radius:13px;background:var(--panel2)">
-<label for="recapScript">WevoLabs သုံးမယ်ဆို Recap Script (မဖြစ်မနေ)</label>
-<textarea id="recapScript" rows="5" maxlength="30000" placeholder="WevoLabs မှာ အသံထုတ်ထားတဲ့ စာသားအတိအကျကို ဒီမှာ paste လုပ်ပါ။"></textarea>
-<p class="muted small">AI Voice ကို App က အလိုအလျောက် ထုတ်ပေးပါမယ်။</p>
+<label for="recapScript">ကိုယ်ပိုင် Recap Script (မထည့်လည်းရသည်)</label>
+<textarea id="recapScript" rows="5" maxlength="30000" placeholder="ကိုယ်ပိုင် Recap Script ရှိလျှင် ဒီမှာ paste လုပ်ပါ။ မထည့်ပါက App က အလိုအလျောက်ရေးပေးပါမယ်။"></textarea>
+<p class="muted small">AI Voice ကို App က အလိုအလျောက် ထုတ်ပေးပါမယ်။
 </div>
 <div class="wizard-nav"><button type="button" class="back back-step" data-back="0">← Back</button><button type="button" class="next-step" data-next="2">Next → Edit Tools</button></div></section>
 <section class="wizard-step" data-step="2"><div class="step-head"><span class="step-number">3</span><div><div class="step-title">Edit Tools</div><div class="step-desc">မြန်မာစာတန်းထိုး၊ Logo၊ အလင်းနဲ့ Music ချိန်ပါ</div></div></div>
 <div class="preview-title">👁️ Live Edit Preview</div><div class="preview" id="preview"><video id="previewVideo" playsinline class="hidden"></video><div class="preview-logo" id="previewLogo"><img id="previewLogoImage" alt="Logo preview"><span id="previewLogoText">My Recap</span></div><div class="preview-text" id="previewText"></div><div class="blur-box" id="blurBox"><span class="resize-handle" id="blurResize" aria-label="Blur width"></span><span class="resize-handle blur-height-handle" id="blurHeightResize" aria-label="Blur height"></span></div><div class="preview-overlay"><div class="preview-subtitle" id="previewSubtitle">မြန်မာစာတန်းထိုး အစမ်းမြင်ကွင်း<span class="resize-handle" id="subtitleResize" aria-label="Resize subtitle"></span></div></div></div><div class="preview-device-hint" id="previewDeviceHint">📱 ဖုန်းမျက်နှာပြင်အကျယ်အလိုက် Live Edit ကို အလိုအလျောက်ချိန်ညှိထားသည်။</div><div class="playback-controls"><button id="previewPlay" type="button">▶ Play</button><input id="previewSeek" type="range" min="0" max="1000" value="0" aria-label="Video seek"><span class="playback-time" id="previewTime">0:00 / 0:00</span></div>
 <p class="muted preview-hint" id="previewHint">Upload Video ရွေးပါ။ အောက်က Edit Tools ပြောင်းတာနဲ့ ဒီမှာပြောင်းလဲမှုကို ကြည့်နိုင်ပါတယ်။</p>
-<details class="edit-tools"><summary class="edit-summary">🎨 Edit Tools — ချိန်ညှိရန် နှိပ်ပါ</summary><div class="edit-adjustments"><div><label>🎞️ FFmpeg Render Mode</label><p class="muted small">Fast Rendering ကို အလိုအလျောက် အသုံးပြုမည်။ Video/Voice Sync၊ Blur၊ Logo နဲ့ မြန်မာစာတန်းထိုးကို ဆက်ထိန်းထားသည်။</p></div><div><label><input id="autoEffect" type="checkbox" style="width:auto;margin-right:5px"> ✨ Auto Effect</label></div><div class="option-grid"><div><label for="blur">Blur Box Strength (px) <span id="blurValue">0</span></label><input id="blur" type="range" min="0" max="70" value="0"><input id="blurX" type="hidden" value="50"><input id="blurY" type="hidden" value="84"><input id="blurW" type="hidden" value="55"><input id="blurH" type="hidden" value="12"><p class="muted small">Blur Box ကို video ပေါ်မှာ လက်နဲ့ရွှေ့/အရွယ်ပြောင်းနိုင်သည်။</p></div><div><label><input id="subtitlesOn" type="checkbox" checked style="width:auto;margin-right:5px"> 📝 Subtitles On / Off</label><label for="subSize">စာတန်းအရွယ်အစား</label><input id="subSize" type="range" min="20" max="64" value="40"></div><div><label for="subColor">စာတန်းအရောင်</label><select id="subColor"><option value="&H00FFFFFF">White</option><option value="&H0000FFFF">Yellow</option><option value="&H0000FF00">Green</option><option value="&H00FF8080">Light Blue</option></select></div><div><label for="subPosition">စာတန်းနေရာ</label><select id="subPosition"><option value="bottom">အောက်</option><option value="middle">အလယ်</option><option value="top">အပေါ်</option></select></div><div><label for="subX">စာတန်း X <span id="subXValue">50%</span></label><input id="subX" type="range" min="5" max="95" value="50"></div><div><label for="subY">စာတန်း Y <span id="subYValue">88%</span></label><input id="subY" type="range" min="5" max="95" value="88"></div><div><label for="subWeight">စာတန်းအထူ</label><select id="subWeight"><option value="bold">Bold</option><option value="normal">Normal</option></select></div><div><label for="subOutline">စာတန်းအနားသတ် <span id="subOutlineValue">2</span></label><input id="subOutline" type="range" min="0" max="6" value="2"></div></div>
+<details class="edit-tools"><summary class="edit-summary">🎨 Edit Tools — ချိန်ညှိရန် နှိပ်ပါ</summary><div class="edit-adjustments"><div><p class="muted small">Fast Rendering ကို အလိုအလျောက် အသုံးပြုမည်။ Video နဲ့ AI Voice ကို sync လုပ်ပေးပါမည်။</p></div><div><label><input id="autoEffect" type="checkbox" style="width:auto;margin-right:5px"> ✨ Auto Effect</label></div><div class="option-grid"><div><label for="blur">Blur Box Strength (px) <span id="blurValue">0</span></label><input id="blur" type="range" min="0" max="70" value="0"><input id="blurX" type="hidden" value="50"><input id="blurY" type="hidden" value="84"><input id="blurW" type="hidden" value="55"><input id="blurH" type="hidden" value="12"><p class="muted small">Blur Box ကို video ပေါ်မှာ လက်နဲ့ရွှေ့/အရွယ်ပြောင်းနိုင်သည်။</p></div><div><label><input id="subtitlesOn" type="checkbox" checked style="width:auto;margin-right:5px"> 📝 Subtitles On / Off</label><label for="subSize">စာတန်းအရွယ်အစား</label><input id="subSize" type="range" min="20" max="64" value="40"></div><div><label for="subColor">စာတန်းအရောင်</label><select id="subColor"><option value="&H00FFFFFF">White</option><option value="&H0000FFFF">Yellow</option><option value="&H0000FF00">Green</option><option value="&H00FF8080">Light Blue</option></select></div><div><label for="subPosition">စာတန်းနေရာ</label><select id="subPosition"><option value="bottom">အောက်</option><option value="middle">အလယ်</option><option value="top">အပေါ်</option></select></div><div><label for="subX">စာတန်း X <span id="subXValue">50%</span></label><input id="subX" type="range" min="5" max="95" value="50"></div><div><label for="subY">စာတန်း Y <span id="subYValue">88%</span></label><input id="subY" type="range" min="5" max="95" value="88"></div><div><label for="subWeight">စာတန်းအထူ</label><select id="subWeight"><option value="bold">Bold</option><option value="normal">Normal</option></select></div><div><label for="subOutline">စာတန်းအနားသတ် <span id="subOutlineValue">2</span></label><input id="subOutline" type="range" min="0" max="6" value="2"></div></div>
 <div class="option-grid"><div><label><input id="mirror" type="checkbox" style="width:auto;margin-right:5px"> Mirror လှန်</label></div><div><label for="logoText">Logo / Watermark စာသား</label><input id="logoText" maxlength="40" value="My Recap" placeholder="My Recap"></div></div><label for="logoImage">🖼️ Logo ပုံ Upload (PNG/JPG/WEBP, 5 MB အထိ)</label><input id="logoImage" type="file" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp"><div class="option-grid"><div><label for="logoX">Logo X <span id="logoXValue">90%</span></label><input id="logoX" type="range" min="0" max="100" value="90"></div><div><label for="logoY">Logo Y <span id="logoYValue">8%</span></label><input id="logoY" type="range" min="0" max="100" value="8"></div><div><label for="logoW">Logo အရွယ်အစား <span id="logoWValue">4%</span></label><input id="logoW" type="range" min="1" max="12" value="4"></div><div><label for="logoOpacity">Logo Opacity <span id="logoOpacityValue">100%</span></label><input id="logoOpacity" type="range" min="10" max="100" value="100"></div></div><label for="overlayText">Video ပေါ်တင်မည့်စာသား</label><input id="overlayText" maxlength="100" placeholder="ကိုယ်ထည့်ချင်တဲ့စာသား"></details><p class="muted small">အများဆုံး 80 MB · 10 မိနစ် · Direct video URL</p>
 <div class="wizard-nav"><button type="button" class="back back-step" data-back="1">← Back</button><button type="button" class="next-step" data-next="3">Next → Final Video</button></div></section>
 <section class="wizard-step" data-step="3"><div class="step-head"><span class="step-number">4</span><div><div class="step-title">Final Video</div><div class="step-desc">သတ်မှတ်ချက်များကို စစ်ပြီး Recap MP4 ထုတ်ပါ</div></div></div><p class="muted small">✓ Video / Voice / Edit Tools အားလုံးပြီးပါပြီ။ Recap ထုတ်ရန် အောက်ကခလုတ်ကို နှိပ်ပါ။</p>
@@ -291,7 +291,7 @@ function loadSavedKeys(){try{geminiInput.value=localStorage.getItem('oneclick_ge
 document.getElementById('saveKeys').addEventListener('click',()=>{const g=geminiInput.value.trim(),q=groqInput.value.trim();if(!g||!q){keyStatus.textContent='Gemini နဲ့ Groq Key နှစ်ခုလုံး ထည့်ပါ။';return;}try{localStorage.setItem('oneclick_gemini_key',g);localStorage.setItem('oneclick_groq_key',q);keyStatus.textContent='Key နှစ်ခုလုံးကို ဒီ Browser ထဲမှာ Save လုပ်ပြီးပါပြီ။';}catch(e){keyStatus.textContent='Save မလုပ်နိုင်ပါ။ Browser storage setting ကို စစ်ပါ။';}});
 document.getElementById('clearKeys').addEventListener('click',()=>{try{localStorage.removeItem('oneclick_gemini_key');localStorage.removeItem('oneclick_groq_key');}catch(e){}geminiInput.value='';groqInput.value='';keyStatus.textContent='Browser ထဲက Saved Keys ကို ဖျက်ပြီးပါပြီ။';});
 loadSavedKeys();
-form.addEventListener('submit',async(e)=>{e.preventDefault();const geminiKey=geminiInput.value.trim(),groqKey=groqInput.value.trim(),videoFile=document.getElementById('videoFile').files[0],videoUrl=document.getElementById('url').value.trim();const recapScript=document.getElementById('recapScript').value.trim();if(!recapScript&&(!geminiKey||!groqKey)){result.classList.remove('hidden');statusBox.textContent='Auto Recap အတွက် API Key Settings မှာ Gemini နဲ့ Groq Key နှစ်ခုလုံးထည့်ပြီး Save Keys ကိုနှိပ်ပါ။ WevoLabs အသံနဲ့ ကိုယ်ပိုင် Script သုံးလျှင် Key မလိုပါ။';return;}if((!videoUrl&&!videoFile)||(videoUrl&&videoFile)){result.classList.remove('hidden');statusBox.textContent='Video URL သို့မဟုတ် Upload Video တစ်ခုကိုပဲ ရွေးပါ။';return;}btn.disabled=true;result.classList.remove('hidden');links.innerHTML='';statusBox.textContent='အလုပ်စတင်နေသည်…';
+form.addEventListener('submit',async(e)=>{e.preventDefault();const geminiKey=geminiInput.value.trim(),groqKey=groqInput.value.trim(),videoFile=document.getElementById('videoFile').files[0],videoUrl=document.getElementById('url').value.trim();const recapScript=document.getElementById('recapScript').value.trim();if(!recapScript&&(!geminiKey||!groqKey)){result.classList.remove('hidden');statusBox.textContent='Auto Recap အတွက် API Key Settings မှာ Gemini နဲ့ Groq Key နှစ်ခုလုံးထည့်ပြီး Save Keys ကိုနှိပ်ပါ။ ကိုယ်ပိုင် Script သုံးလျှင် API Key မလိုပါ။';return;}if((!videoUrl&&!videoFile)||(videoUrl&&videoFile)){result.classList.remove('hidden');statusBox.textContent='Video URL သို့မဟုတ် Upload Video တစ်ခုကိုပဲ ရွေးပါ။';return;}btn.disabled=true;result.classList.remove('hidden');links.innerHTML='';statusBox.textContent='အလုပ်စတင်နေသည်…';
 try{const body=new FormData();const options={trim_start:0,trim_end:"",render_mode:'fast',voice:document.getElementById('voice').value,voice_speed:document.getElementById('voiceSpeed').value,subtitle_pace:document.getElementById('subtitlePace').value,auto_effect:document.getElementById('autoEffect').checked,blur:document.getElementById('blur').value,blur_x:document.getElementById('blurX').value,blur_y:document.getElementById('blurY').value,blur_w:document.getElementById('blurW').value,blur_h:document.getElementById('blurH').value,mirror:document.getElementById('mirror').checked,sub_size:document.getElementById('subSize').value,sub_color:document.getElementById('subColor').value,sub_position:document.getElementById('subPosition').value,sub_x:document.getElementById('subX').value,sub_y:document.getElementById('subY').value,sub_weight:document.getElementById('subWeight').value,sub_outline:document.getElementById('subOutline').value,logo_text:'',logo_x:document.getElementById('logoX').value,logo_y:document.getElementById('logoY').value,logo_w:document.getElementById('logoW').value,logo_opacity:document.getElementById('logoOpacity').value,overlay_text:document.getElementById('overlayText').value,subtitles_on:false,};body.append('url',videoFile?'':videoUrl);body.append('language',document.getElementById('language').value);body.append('gemini_api_key',geminiKey);body.append('groq_api_key',groqKey);Object.entries(options).forEach(([k,v])=>body.append(k,String(v)));if(videoFile)body.append('video',videoFile);body.append('recap_script',document.getElementById('recapScript').value.trim());const res=await fetch('/api/jobs',{method:'POST',body});const data=await res.json();if(!res.ok)throw new Error(data.error||'စတင်၍မရပါ');poll(data.id);}catch(err){statusBox.textContent='အမှား: '+err.message;btn.disabled=false;}});
 async function poll(id){try{const res=await fetch('/api/jobs/'+id);const data=await res.json();if(!res.ok){if(res.status===404){statusBox.textContent='အရင် Job ကို server မှာ မတွေ့တော့ပါ။ Render restart/redeploy ဖြစ်ခဲ့နိုင်ပါတယ်။ Video ရွေးထားဆဲဆိုရင် Generate Final Video ကို ထပ်နှိပ်ပြီး Job အသစ်စတင်ပါ။';links.innerHTML='';btn.disabled=false;showStep(3);return;}throw new Error(data.error||'အခြေအနေမရပါ');}statusBox.textContent=data.message||data.status;
 if(data.status==='done'){links.innerHTML='<button type="button" id="finalBackBtn" class="back" style="width:100%;margin-bottom:12px">← နောက်သို့ — Edit Tools ပြန်သွားရန်</button><h3>🎬 Final Video Preview</h3><video id="finalVideoPreview" controls playsinline preload="metadata" style="display:block;width:100%;max-height:72vh;aspect-ratio:16/9;object-fit:contain;background:#05070d;border:1px solid #31435e;border-radius:14px;margin:10px 0" src="/api/jobs/'+id+'/preview"></video><a class="download" href="/api/jobs/'+id+'/download">⬇️ Final MP4 ဒေါင်းလုဒ်လုပ်ရန်</a>';document.getElementById('finalBackBtn').addEventListener('click',()=>{document.getElementById('jobform').parentElement.style.display='';showStep(2);document.getElementById('editTools')?.scrollIntoView({behavior:'smooth',block:'start'});});document.getElementById('jobform').parentElement.style.display='none';document.querySelectorAll('main > p.muted').forEach(el=>el.style.display='none');document.querySelector('#result h2').textContent='🎬 Final Video Preview';btn.disabled=false;showStep(3);statusBox.scrollIntoView({behavior:'smooth',block:'center'});return;}
@@ -611,64 +611,7 @@ def split_subtitle_cues(text, pace="normal"):
             start = max(start + 1, end_index)
     return cues or [text]
 
-def make_subtitles(script, voice_path, srt_path, video_path=None, options=None):
-    import unicodedata
-    script = unicodedata.normalize("NFC", clean_myanmar_text(script))
-    options = options or {}
-    duration_text = run_command(["ffprobe", "-v", "error", "-show_entries", "format=duration",
-                                 "-of", "default=noprint_wrappers=1:nokey=1", str(voice_path)], timeout=30)
-    duration = float(duration_text)
-    width, height = 1280, 720
-    if video_path:
-        dimensions = run_command(["ffprobe", "-v", "error", "-select_streams", "v:0",
-                                  "-show_entries", "stream=width,height", "-of", "csv=s=x:p=0", str(video_path)], timeout=30)
-        try: width, height = [int(v) for v in dimensions.strip().split("x")[:2]]
-        except Exception: pass
-    if duration <= 0: fail("Voice audio duration မမှန်ပါ။")
-    chunks = split_subtitle_cues(script, options.get("subtitle_pace", "normal"))
-    weights = [max(1, len(subtitle_units(chunk))) for chunk in chunks]
-    total_weight = sum(weights)
-    x = round(width * max(5, min(95, int(options.get("sub_x", 50)))) / 100)
-    default_y = {"bottom":88,"middle":50,"top":20}.get(options.get("sub_position"),88)
-    y = round(height * max(5, min(95, int(options.get("sub_y", default_y))) ) / 100)
-    size = max(20, min(64, int(options.get("sub_size",40))))
-    # Match live preview sizing: use slider units as source-video pixels.
-    render_size = size
-    color = options.get("sub_color","&H00FFFFFF")
-    bold = -1 if options.get("sub_weight","bold") == "bold" else 0
-    outline = max(0,min(6,int(options.get("sub_outline",2))))
-    with open(srt_path, "w", encoding="utf-8") as f:
-        f.write("\ufeff[Script Info]\nScriptType: v4.00+\nWrapStyle: 0\nScaledBorderAndShadow: yes\n")
-        f.write(f"PlayResX: {width}\nPlayResY: {height}\n\n[V4+ Styles]\n")
-        f.write("Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n")
-        # Use Unicode Myanmar font (Padauk) for correct Unicode subtitle rendering.
-        font_family = "Padauk"
-        f.write(f"Style: Default,{font_family},{render_size},{color},&H000000FF,&H00000000,&H80000000,{bold},0,1,{outline},1,5,{round(width*0.03)},{round(width*0.03)},10,1\n")
-        logo_text = (options.get("logo_text") or "").strip().replace("{","(").replace("}",")").replace("\n"," ")
-        if logo_text:
-            logo_width = max(1, min(12, int(options.get("logo_w",4))))
-            logo_size = max(12, round(height * logo_width / 100 * 0.12))
-            logo_x = round(width * max(0, min(100, int(options.get("logo_x",90)))) / 100)
-            logo_y = round(height * max(0, min(100, int(options.get("logo_y",8)))) / 100)
-            logo_opacity = max(10, min(100, int(options.get("logo_opacity",100))))
-            logo_alpha = round(255 * (100-logo_opacity) / 100)
-            f.write(f"Style: Logo,{font_family},{logo_size},&H{logo_alpha:02X}FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,1,1,0,5,10,10,10,1\n")
-        f.write("\n[Events]\n")
-        f.write("Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n")
-        current = 0.0
-        def ass_time(seconds):
-            cs = int(max(0,seconds)*100)
-            hh,rem=divmod(cs,360000); mm,rem=divmod(rem,6000); ss,cc=divmod(rem,100)
-            return f"{hh}:{mm:02}:{ss:02}.{cc:02}"
-        if logo_text:
-            f.write(f"Dialogue: 1,0:00:00.00,{ass_time(duration)},Logo,,0,0,0,,{{\\pos({logo_x},{logo_y})}}{logo_text}\n")
-        for chunk,weight in zip(chunks,weights):
-            start=current; current += duration*weight/total_weight; end=min(duration,current)
-            safe=chunk.replace("{","(").replace("}",")").replace("\\","\\\\").replace("\n"," ")
-            f.write(f"Dialogue: 0,{ass_time(start)},{ass_time(end)},Default,,0,0,0,,{{\\pos({x},{y})}}{safe}\n")
-
-def render_video(video_path, voice_path, srt_path, output_path, options, music_path=None, logo_path=None):
-    srt_name = str(srt_path).replace("\\", "\\\\").replace(":", "\\:").replace("'", "\\'")
+def render_video(video_path, voice_path, output_path, options, music_path=None):
     blur = max(0, min(70, int(options.get("blur", 0))))
     bx = max(0, min(100, int(options.get("blur_x", 50))))
     by = max(0, min(100, int(options.get("blur_y", 84))))
@@ -678,7 +621,6 @@ def render_video(video_path, voice_path, srt_path, output_path, options, music_p
     def esc_text(value):
         return value.replace("\\", "\\\\").replace(":", "\\:").replace("'", "\\'").replace("%", "\\%").replace(",", "\\,")
 
-    logo = ""
     overlay = (options.get("overlay_text") or "").strip()
 
     # Use the full source video and fit its playback timeline to the final AI voice.
@@ -713,18 +655,10 @@ def render_video(video_path, voice_path, srt_path, output_path, options, music_p
 
     command = ["ffmpeg", "-y", "-i", str(video_path), "-i", str(voice_path)]
     music_index = None
-    logo_index = None
     if music_path and music_path.exists() and music_path.stat().st_size:
         command += ["-stream_loop", "-1", "-i", str(music_path)]
         music_index = 2
-    if False and logo_path and logo_path.exists() and logo_path.stat().st_size:
-        command += ["-i", str(logo_path)]
-        logo_index = 3 if music_index is not None else 2
-
-    # Build one graph so mirror, regional blur, optional subtitles, and image watermark work together.
-    # Subtitles are disabled in this simplified export mode.
-    subtitles_on = False
-    subtitle_filter = "subtitles=filename='" + srt_name + "'" if subtitles_on else "null"
+    # Build the final video with enabled visual effects; SRT remains a separate download.
     graph = []
     pre = ",".join(base_filters) if base_filters else "null"
     if blur > 0:
@@ -740,18 +674,11 @@ def render_video(video_path, voice_path, srt_path, output_path, options, music_p
         # Keep the exported blur exactly aligned with the preview box.
         overlay_y = f"max(0,min(H-h,H*{by/100}-H*{bh/100}/2-100))"
         graph.append(f"[vclean][vblur]overlay=x='{overlay_x}':y='{overlay_y}':eof_action=repeat[vblurred]")
-        graph.append("[vblurred]" + subtitle_filter + "[vbase]")
+        graph.append("[vblurred]null[vbase]")
     else:
-        graph.append("[0:v:0]" + pre + "," + subtitle_filter + "[vbase]")
+        graph.append("[0:v:0]" + pre + "[vbase]")
 
-    if logo_index is not None:
-        lx, ly = int(options.get("logo_x",90)), int(options.get("logo_y",8))
-        op = max(10,min(100,int(options.get("logo_opacity",100))))/100
-        graph.append(f"[{logo_index}:v:0][vbase]scale2ref=w=oh*mdar:h=ih*{max(1,min(12,int(options.get('logo_w',4))))/100}[logo][vref]")
-        graph.append("[logo]format=rgba,colorchannelmixer=aa=" + str(op) + "[logoalpha]")
-        graph.append("[vref][logoalpha]overlay=x='W*" + str(lx/100) + "-w/2':y='H*" + str(ly/100) + "-h/2':eof_action=repeat[vout]")
-    else:
-        graph.append("[vbase]null[vout]")
+    graph.append("[vbase]null[vout]")
 
     if music_index is not None:
         volume=max(0,min(100,int(options.get("music_volume",20))))/100
@@ -767,9 +694,7 @@ def render_video(video_path, voice_path, srt_path, output_path, options, music_p
         voice_duration = max(0.1, float(voice_duration_text))
     except (TypeError, ValueError):
         fail("AI Voice timeline duration ကို မဖတ်နိုင်ပါ။")
-    # Choose an encoding profile while keeping the same timing and edit filters.
-    render_mode = str(options.get("render_mode", "balanced")).lower()
-    # Keep the export path simple and prioritize render speed.
+    # Use the fixed fast encoding profile for consistent render speed.
     profile = {"preset": "ultrafast", "crf": "28", "threads": "0", "audio_bitrate": "128k"}
     command += ["-filter_complex",";".join(graph),"-map","[vout]","-map","[aout]",
                 "-t", f"{voice_duration:.3f}", "-c:v","libx264","-preset",profile["preset"],"-crf",profile["crf"],
@@ -837,7 +762,6 @@ def process_job(job_id, url, language, workdir, gemini_api_key, groq_api_key, op
         video = workdir / "source.mp4"
         original_audio = workdir / "source.mp3"
         voice = workdir / "recap_voice.mp3"
-        subtitles = workdir / "recap.ass"
         output = workdir / "movie_recap.mp4"
 
         if uploaded:
@@ -861,37 +785,21 @@ def process_job(job_id, url, language, workdir, gemini_api_key, groq_api_key, op
         script = clean_myanmar_text(script)
         (workdir / "recap.txt").write_text(script, encoding="utf-8")
 
-        wevolabs_upload = workdir / "wevolabs_voice_upload"
-        if wevolabs_upload.is_file() and wevolabs_upload.stat().st_size:
-            update_job(job_id, message="တင်ထားသော WevoLabs Burmese Voice ကို ပြင်ဆင်နေသည်…")
-            speed_factor = max(0.7, min(1.3, float(options.get("voice_speed", 120)) / 100.0))
-            run_command(["ffmpeg", "-y", "-i", str(wevolabs_upload), "-vn", "-af", f"atempo={speed_factor:.3f}", "-codec:a", "libmp3lame", "-q:a", "3", str(voice)], timeout=240)
-            if not voice.is_file() or not voice.stat().st_size:
-                fail("WevoLabs အသံဖိုင်ကို ဖတ်မရပါ။ MP3 သို့မဟုတ် WAV ဖိုင်ကို ပြန်တင်ပါ။")
-        else:
-            update_job(job_id, message="AI Voice ဖန်တီးနေသည်…")
-            synthesize_voice(script, language, voice, options.get("voice", "my-MM-NilarNeural"), options.get("voice_speed", 120))
+        update_job(job_id, message="AI Voice ဖန်တီးနေသည်…")
+        synthesize_voice(script, language, voice, options.get("voice", "my-MM-NilarNeural"), options.get("voice_speed", 120))
 
         # Keep the selected narration pace. Do not stretch narration to the source-video duration.
         update_job(job_id, message="ရွေးထားသော AI Voice ပြောနှုန်းအတိုင်း စာတန်းထိုးအချိန်ညှိနေသည်…")
 
-        update_job(job_id, message="Unicode မြန်မာစာတန်းထိုး အချိန်ညှိနေသည်…")
+        update_job(job_id, message="AI Voice ပြီးပါပြီ။ Final MP4 ကို တည်ဆောက်နေသည်…")
         music_path = workdir / "background_music"
         if not music_path.exists():
             music_path = None
-        logo_path = workdir / "logo_image"
-        if not logo_path.exists():
-            logo_path = None
-        # Show one consistent logo in preview and final output: uploaded image takes
-        # precedence; otherwise use the default/custom text watermark.
-        if logo_path:
-            options["logo_text"] = ""
-        make_subtitles(script, voice, subtitles, video, options)
         srt_file = workdir / "recap.srt"
         make_srt(script, voice, srt_file, options)
 
         update_job(job_id, message="နောက်ဆုံး MP4 ကို တည်ဆောက်နေသည်။ ခဏစောင့်ပါ…")
-        render_video(video, voice, subtitles, output, options, music_path, logo_path)
+        render_video(video, voice, output, options, music_path)
         save_latest_artifacts(workdir)
         title = JOBS.get(job_id, {}).get("title") or "Movie Recap"
         update_job(job_id, status="done", message="ပြီးပါပြီ။ Final MP4 ကို အောက်တွင် Preview ကြည့်ပြီး Download လုပ်နိုင်ပါသည်။",
@@ -901,7 +809,7 @@ def process_job(job_id, url, language, workdir, gemini_api_key, groq_api_key, op
     finally:
         # Keep only completed outputs temporarily for download; remove source and intermediates.
         try:
-            for name in ("source.mp4", "source.mp3", "background_music", "logo_image", "wevolabs_voice_upload"):
+            for name in ("source.mp4", "source.mp3", "background_music"):
                 path = workdir / name
                 if path.exists():
                     path.unlink()
@@ -951,7 +859,6 @@ def create_job():
     from flask import request
     uploaded_file = None
     music_file = None
-    wevolabs_voice_file = None
     recap_script = ""
     if request.is_json:
         data = request.get_json(silent=True) or {}
@@ -966,16 +873,11 @@ def create_job():
         gemini_api_key = (request.form.get("gemini_api_key") or "").strip()
         groq_api_key = (request.form.get("groq_api_key") or "").strip()
         recap_script = (request.form.get("recap_script") or "").strip()
-        wevolabs_voice_file = request.files.get("wevolabs_voice")
-        if wevolabs_voice_file and not wevolabs_voice_file.filename:
-            wevolabs_voice_file = None
-        options = {"voice": request.form.get("voice", ""), "render_mode": "fast", "voice_speed": request.form.get("voice_speed", "100"), "brightness": request.form.get("brightness", "100"), "contrast": request.form.get("contrast", "100"), "saturation": request.form.get("saturation", "100"), "blur": request.form.get("blur", "0"), "mirror": request.form.get("mirror") == "true", "sub_size": request.form.get("sub_size", "20"), "sub_color": request.form.get("sub_color", "&H00FFFFFF"), "sub_position": request.form.get("sub_position", "bottom"), "logo_text": request.form.get("logo_text", "")[:40], "overlay_text": request.form.get("overlay_text", "")[:100], "music_volume": request.form.get("music_volume", "20"), "auto_effect": request.form.get("auto_effect", "true") == "true", "blur_x": request.form.get("blur_x","50"), "blur_y": request.form.get("blur_y","84"), "blur_w": request.form.get("blur_w","55"), "blur_h": request.form.get("blur_h","12"), "sub_x": request.form.get("sub_x","50"), "sub_y": request.form.get("sub_y","88"), "sub_weight": request.form.get("sub_weight","bold"), "sub_outline": request.form.get("sub_outline","2"), "subtitles_on": request.form.get("subtitles_on","true") == "true", "logo_x": request.form.get("logo_x","90"), "logo_y": request.form.get("logo_y","8"), "logo_opacity": request.form.get("logo_opacity","100")}
+        options = {"voice": request.form.get("voice", ""), "voice_speed": request.form.get("voice_speed", "100"), "brightness": request.form.get("brightness", "100"), "contrast": request.form.get("contrast", "100"), "saturation": request.form.get("saturation", "100"), "blur": request.form.get("blur", "0"), "mirror": request.form.get("mirror") == "true", "sub_size": request.form.get("sub_size", "20"), "sub_color": request.form.get("sub_color", "&H00FFFFFF"), "sub_position": request.form.get("sub_position", "bottom"), "logo_text": request.form.get("logo_text", "")[:40], "overlay_text": request.form.get("overlay_text", "")[:100], "music_volume": request.form.get("music_volume", "20"), "auto_effect": request.form.get("auto_effect", "true") == "true", "blur_x": request.form.get("blur_x","50"), "blur_y": request.form.get("blur_y","84"), "blur_w": request.form.get("blur_w","55"), "blur_h": request.form.get("blur_h","12"), "sub_x": request.form.get("sub_x","50"), "sub_y": request.form.get("sub_y","88"), "sub_weight": request.form.get("sub_weight","bold"), "sub_outline": request.form.get("sub_outline","2"), "subtitles_on": request.form.get("subtitles_on","true") == "true", "logo_x": request.form.get("logo_x","90"), "logo_y": request.form.get("logo_y","8"), "logo_opacity": request.form.get("logo_opacity","100")}
         uploaded_file = request.files.get("video")
         if uploaded_file and not uploaded_file.filename:
             uploaded_file = None
         music_file = request.files.get("music")
-        logo_file = request.files.get("logo_image")
-        if logo_file and not logo_file.filename: logo_file = None
         if music_file and not music_file.filename:
             music_file = None
     if not recap_script and (not gemini_api_key or not groq_api_key):
@@ -990,12 +892,7 @@ def create_job():
         return jsonify({"error": "ဘာသာစကားရွေးချယ်မှု မမှန်ပါ။"}), 400
     if len(recap_script) > 30000:
         return jsonify({"error": "Recap Script သည် စာလုံး 30,000 ထက် မကျော်ရပါ။"}), 400
-    if wevolabs_voice_file and (language != "my" or not recap_script):
-        return jsonify({"error": "WevoLabs Burmese Voice သုံးရန် မြန်မာဘာသာကို ရွေးပြီး Recap Script အတိအကျကို ထည့်ပါ။"}), 400
-    if wevolabs_voice_file and not (wevolabs_voice_file.filename or "").lower().endswith((".mp3", ".wav")):
-        return jsonify({"error": "WevoLabs အသံဖိုင်ကို MP3 သို့မဟုတ် WAV format ဖြင့် တင်ပါ။"}), 400
     if request.is_json: options = data.get("options") or {}
-    if request.is_json: logo_file = None
     allowed_voices = ("my-MM-NilarNeural", "my-MM-ThihaNeural")
     if options.get("voice") not in allowed_voices: options["voice"] = "my-MM-NilarNeural"
     try: options["voice_speed"] = max(70, min(130, int(options.get("voice_speed", 100))))
@@ -1030,8 +927,6 @@ def create_job():
             validate_public_http_url(url)
         except Exception as exc:
             return jsonify({"error": str(exc)}), 400
-    if logo_file and not (logo_file.filename or "").lower().endswith((".png",".jpg",".jpeg",".webp")):
-        return jsonify({"error":"Logo ပုံကို PNG, JPG သို့မဟုတ် WEBP သာ သုံးပါ။"}), 400
     if music_file:
         music_name = (music_file.filename or "").lower()
         if not music_name.endswith((".mp3", ".wav", ".m4a", ".aac", ".ogg")):
@@ -1051,14 +946,6 @@ def create_job():
             source_path.unlink(missing_ok=True)
             workdir.rmdir()
             return jsonify({"error": "ဗီဒီယို 80 MB ထက်ကြီးနေသည်။ ပိုသေးသောဖိုင်ကို သုံးပါ။"}), 413
-    if logo_file:
-        logo_path = workdir / "logo_image"
-        logo_file.save(logo_path)
-        if logo_path.stat().st_size == 0 or logo_path.stat().st_size > 5*1024*1024:
-            logo_path.unlink(missing_ok=True)
-            if uploaded: (workdir / "source.mp4").unlink(missing_ok=True)
-            workdir.rmdir()
-            return jsonify({"error":"Logo ပုံသည် 5 MB အောက် ဖြစ်ရပါမည်။"}), 413
     if music_file:
         music_path = workdir / "background_music"
         music_file.save(music_path)
@@ -1074,14 +961,6 @@ def create_job():
                 (workdir / "source.mp4").unlink(missing_ok=True)
             workdir.rmdir()
             return jsonify({"error": "Background Music ဖိုင် အလွတ်ဖြစ်နေသည်။"}), 400
-    if wevolabs_voice_file:
-        wevo_path = workdir / "wevolabs_voice_upload"
-        wevolabs_voice_file.save(wevo_path)
-        if wevo_path.stat().st_size == 0 or wevo_path.stat().st_size > 50 * 1024 * 1024:
-            wevo_path.unlink(missing_ok=True)
-            if uploaded: (workdir / "source.mp4").unlink(missing_ok=True)
-            shutil.rmtree(workdir, ignore_errors=True)
-            return jsonify({"error": "WevoLabs အသံဖိုင်သည် အလွတ်မဖြစ်ရပါ၊ 50 MB အောက် ဖြစ်ရပါမည်။"}), 413
     with JOBS_LOCK:
         JOBS[job_id] = {"status": "queued", "message": "အလုပ်တန်းစီနေသည်…", "created": time.time(), "title": (Path(uploaded_file.filename).name if uploaded_file and uploaded_file.filename else (Path(urlparse(url).path).name or "Movie Recap"))[:180]}
         _save_job_locked(job_id)
