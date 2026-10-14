@@ -226,7 +226,7 @@ main{padding-left:max(0px,env(safe-area-inset-left));padding-right:max(0px,env(s
 <details class="edit-tools"><summary class="edit-summary">🎨 Edit Tools — ချိန်ညှိရန် နှိပ်ပါ</summary><div class="edit-adjustments"><div><p class="muted small">Fast Rendering ကို အလိုအလျောက် အသုံးပြုမည်။ Video နဲ့ AI Voice ကို sync လုပ်ပေးပါမည်။</p></div><div><label><input id="autoBlurSubtitles" type="checkbox" checked style="width:auto;margin-right:5px"> 🌫️ Auto Blur Original Subtitles</label></div><div><label><input id="autoEffect" type="checkbox" style="width:auto;margin-right:5px"> ✨ Auto Effect</label></div><div class="option-grid"><div><label><input id="subtitlesOn" type="checkbox" checked style="width:auto;margin-right:5px"> 📝 Subtitles On / Off</label><label for="subSize">စာတန်းအရွယ်အစား</label><input id="subSize" type="range" min="20" max="64" value="40"></div><div><label for="subColor">စာတန်းအရောင်</label><select id="subColor"><option value="&H00FFFFFF">White</option><option value="&H0000FFFF">Yellow</option><option value="&H0000FF00">Green</option><option value="&H00FF8080">Light Blue</option></select></div><div><label for="subPosition">စာတန်းနေရာ</label><select id="subPosition"><option value="bottom">အောက်</option><option value="middle">အလယ်</option><option value="top">အပေါ်</option></select></div><div><label for="subX">စာတန်း X <span id="subXValue">50%</span></label><input id="subX" type="range" min="5" max="95" value="50"></div><div><label for="subY">စာတန်း Y <span id="subYValue">88%</span></label><input id="subY" type="range" min="5" max="95" value="88"></div><div><label for="subWeight">စာတန်းအထူ</label><select id="subWeight"><option value="bold">Bold</option><option value="normal">Normal</option></select></div><div><label for="subOutline">စာတန်းအနားသတ် <span id="subOutlineValue">2</span></label><input id="subOutline" type="range" min="0" max="6" value="2"></div></div>
 <div class="option-grid"><div><label><input id="mirror" type="checkbox" style="width:auto;margin-right:5px"> Mirror လှန်</label></div><div><label for="logoText">Logo / Watermark စာသား</label><input id="logoText" maxlength="40" value="My Recap" placeholder="My Recap"></div></div><label for="logoImage">🖼️ Logo ပုံ Upload (PNG/JPG/WEBP, 5 MB အထိ)</label><input id="logoImage" type="file" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp"><div class="option-grid"><div><label for="logoX">Logo X <span id="logoXValue">90%</span></label><input id="logoX" type="range" min="0" max="100" value="90"></div><div><label for="logoY">Logo Y <span id="logoYValue">8%</span></label><input id="logoY" type="range" min="0" max="100" value="8"></div><div><label for="logoW">Logo အရွယ်အစား <span id="logoWValue">4%</span></label><input id="logoW" type="range" min="1" max="12" value="4"></div><div><label for="logoOpacity">Logo Opacity <span id="logoOpacityValue">100%</span></label><input id="logoOpacity" type="range" min="10" max="100" value="100"></div></div></details><p class="muted small">အများဆုံး 80 MB · 10 မိနစ် · Direct video URL</p>
 <div class="wizard-nav"><button type="button" class="back back-step" data-back="1">← Back</button><button type="button" class="next-step" data-next="3">Next → Final Video</button></div></section>
-<section class="wizard-step" data-step="3"><div class="step-head"><span class="step-number">4</span><div><div class="step-title">Final Video</div><div class="step-desc">သတ်မှတ်ချက်များကို စစ်ပြီး Recap MP4 ထုတ်ပါ</div></div></div><p class="muted small">✓ Video / Voice / Edit Tools အားလုံးပြီးပါပြီ။ Recap ထုတ်ရန် အောက်ကခလုတ်ကို နှိပ်ပါ။</p>
+<section class="wizard-step" data-step="3"><div class="step-head"><span class="step-number">3</span><div><div class="step-title">Final Video</div><div class="step-desc">သတ်မှတ်ချက်များကို စစ်ပြီး Recap MP4 ထုတ်ပါ</div></div></div><p class="muted small">✓ Video / Voice / Edit Tools အားလုံးပြီးပါပြီ။ Recap ထုတ်ရန် အောက်ကခလုတ်ကို နှိပ်ပါ။</p>
 <button id="submit" type="submit">🎬 Generate Final Video</button><div class="wizard-nav"><button type="button" class="back back-step" data-back="1">← Back to Voice</button></div></section>
 </form></div>
 <div id="result" class="panel hidden"><div id="loadingPercent" class="loading-percent">0%</div><div class="loading-track"><div id="loadingBar" class="loading-bar" style="width:0%"></div></div><div id="status" class="status" aria-live="polite"></div><div id="links"></div></div>
@@ -611,7 +611,7 @@ def split_subtitle_cues(text, pace="normal"):
             start = max(start + 1, end_index)
     return cues or [text]
 
-def render_video(video_path, voice_path, output_path, options, music_path=None):
+def render_video(video_path, voice_path, output_path, options, music_path=None, progress_callback=None):
     def esc_text(value):
         return value.replace("\\", "\\\\").replace(":", "\\:").replace("'", "\\'").replace("%", "\\%").replace(",", "\\,")
 
@@ -686,7 +686,36 @@ def render_video(video_path, voice_path, output_path, options, music_path=None):
                 "-t", f"{voice_duration:.3f}", "-c:v","libx264","-preset",profile["preset"],"-crf",profile["crf"],
                 "-threads",profile["threads"],"-filter_complex_threads","2","-c:a","aac","-b:a",profile["audio_bitrate"],"-ar","44100","-map_metadata","-1",
                 "-movflags","+faststart",str(output_path)]
-    run_command(command, timeout=900)
+    # Stream FFmpeg's real encoding progress so the UI percentage advances during rendering.
+    command += ["-progress", "pipe:1", "-nostats"]
+    try:
+        proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                text=True, bufsize=1)
+        last_fraction = 0.0
+        for line in proc.stdout:
+            if "=" not in line:
+                continue
+            key, value = line.strip().split("=", 1)
+            if key in ("out_time_us", "out_time_ms"):
+                try:
+                    # FFmpeg's out_time_ms value is in microseconds despite its name.
+                    elapsed = max(0.0, float(value) / 1_000_000)
+                    fraction = min(1.0, elapsed / voice_duration)
+                    if progress_callback and fraction > last_fraction:
+                        last_fraction = fraction
+                        progress_callback(80 + int(fraction * 19))
+                except (TypeError, ValueError, ZeroDivisionError):
+                    pass
+        stderr_text = proc.stderr.read() if proc.stderr else ""
+        return_code = proc.wait(timeout=900)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.wait()
+        fail("Video processing အချိန်ကျော်သွားသည်။ ပိုတိုသော clip ဖြင့် စမ်းပါ။")
+    if return_code != 0:
+        fail("Video processing မအောင်မြင်ပါ။ FFmpeg: " + (stderr_text or "Unknown FFmpeg error")[-1200:])
+    if progress_callback:
+        progress_callback(99)
     if not output_path.exists() or output_path.stat().st_size == 0:
         fail("MP4 ဖိုင် မထွက်လာပါ။")
     audio_check = run_command(["ffprobe","-v","error","-select_streams","a:0","-show_entries","stream=codec_name","-of","default=noprint_wrappers=1:nokey=1",str(output_path)], timeout=30).strip()
@@ -785,7 +814,7 @@ def process_job(job_id, url, language, workdir, gemini_api_key, groq_api_key, op
         make_srt(script, voice, srt_file, options)
 
         update_job(job_id, progress=80)
-        render_video(video, voice, output, options, music_path)
+        render_video(video, voice, output, options, music_path, progress_callback=lambda percent: update_job(job_id, progress=percent))
         save_latest_artifacts(workdir)
         title = JOBS.get(job_id, {}).get("title") or "Movie Recap"
         update_job(job_id, status="done", progress=100, message="",
