@@ -165,6 +165,13 @@ a{color:#9fbaff}
 <section class="wizard-step" data-step="1"><div class="step-head"><span class="step-number">2</span><div><div class="step-title">Voice & Language</div><div class="step-desc">Recap ဘာသာနဲ့ AI အသံ ရွေးပါ</div></div></div>
 <div class="option-grid"><div><label for="language">Recap ဘာသာ</label><select id="language" name="language"><option value="my">မြန်မာ</option><option value="en">English</option></select></div><div><label for="voice">Voice</label><select id="voice" name="voice"><option value="my-MM-NilarNeural">မြန်မာ Nilar (မိန်းမသံ)</option><option value="my-MM-ThihaNeural">မြန်မာ Thiha (ယောက်ျားသံ)</option><option value="en-US-AriaNeural">English Aria</option><option value="en-US-GuyNeural">English Guy</option><option value="en-GB-SoniaNeural">English Sonia</option></select></div></div>
 <p class="muted small">AI Voice ကို တင်ထားတဲ့ Video အရှည်နဲ့ အလိုအလျောက် အချိန်ညှိပေးပါမယ်။</p>
+<div style="margin-top:14px;padding:14px;border:1px solid var(--border);border-radius:13px;background:var(--panel2)">
+<label for="recapScript">WevoLabs သုံးမယ်ဆို Recap Script (မဖြစ်မနေ)</label>
+<textarea id="recapScript" rows="5" maxlength="30000" placeholder="WevoLabs မှာ အသံထုတ်ထားတဲ့ စာသားအတိအကျကို ဒီမှာ paste လုပ်ပါ။"></textarea>
+<label for="wevolabsVoice">WevoLabs မှ ထုတ်ထားသော Burmese Voice ဖိုင် (MP3 / WAV)</label>
+<input id="wevolabsVoice" type="file" accept=".mp3,.wav,audio/mpeg,audio/wav,audio/x-wav">
+<p class="muted small">WevoLabs မှာ ဒီ Script အတိအကျကို အသံထုတ်ပြီး MP3/WAV ကို တင်ပါ။ မတင်ထားရင် လက်ရှိ Edge TTS ကို သုံးပါမယ်။ WevoLabs အသံအတွက် မြန်မာဘာသာကို ရွေးထားပါ။</p>
+</div>
 <div class="wizard-nav"><button type="button" class="back back-step" data-back="0">← Back</button><button type="button" class="next-step" data-next="2">Next → Edit Tools</button></div></section>
 <section class="wizard-step" data-step="2"><div class="step-head"><span class="step-number">3</span><div><div class="step-title">Edit Tools</div><div class="step-desc">မြန်မာစာတန်းထိုး၊ Logo၊ အလင်းနဲ့ Music ချိန်ပါ</div></div></div>
 <div class="preview-title">👁️ Live Edit Preview</div><div class="preview" id="preview"><video id="previewVideo" playsinline class="hidden"></video><div class="preview-logo" id="previewLogo"><img id="previewLogoImage" alt="Logo preview"><span id="previewLogoText">My Recap</span></div><div class="preview-text" id="previewText"></div><div class="blur-box" id="blurBox"><span class="resize-handle" id="blurResize" aria-label="Blur width"></span><span class="resize-handle blur-height-handle" id="blurHeightResize" aria-label="Blur height"></span></div><div class="preview-overlay"><div class="preview-subtitle" id="previewSubtitle">မြန်မာစာတန်းထိုး အစမ်းမြင်ကွင်း<span class="resize-handle" id="subtitleResize" aria-label="Resize subtitle"></span></div></div></div><div class="playback-controls"><button id="previewPlay" type="button">▶ Play</button><input id="previewSeek" type="range" min="0" max="1000" value="0" aria-label="Video seek"><span class="playback-time" id="previewTime">0:00 / 0:00</span></div><p class="muted preview-hint" id="previewHint">Upload Video ရွေးပါ။ အောက်က Edit Tools ပြောင်းတာနဲ့ ဒီမှာပြောင်းလဲမှုကို ကြည့်နိုင်ပါတယ်။</p>
@@ -237,7 +244,7 @@ document.getElementById('saveKeys').addEventListener('click',()=>{const g=gemini
 document.getElementById('clearKeys').addEventListener('click',()=>{try{localStorage.removeItem('oneclick_gemini_key');localStorage.removeItem('oneclick_groq_key');}catch(e){}geminiInput.value='';groqInput.value='';keyStatus.textContent='Browser ထဲက Saved Keys ကို ဖျက်ပြီးပါပြီ။';});
 loadSavedKeys();
 form.addEventListener('submit',async(e)=>{e.preventDefault();const geminiKey=geminiInput.value.trim(),groqKey=groqInput.value.trim(),videoFile=document.getElementById('videoFile').files[0],videoUrl=document.getElementById('url').value.trim();if(!geminiKey||!groqKey){result.classList.remove('hidden');statusBox.textContent='အရင်ဆုံး API Key Settings မှာ Gemini နဲ့ Groq Key နှစ်ခုလုံးထည့်ပြီး Save Keys ကိုနှိပ်ပါ။';return;}if((!videoUrl&&!videoFile)||(videoUrl&&videoFile)){result.classList.remove('hidden');statusBox.textContent='Video URL သို့မဟုတ် Upload Video တစ်ခုကိုပဲ ရွေးပါ။';return;}btn.disabled=true;result.classList.remove('hidden');links.innerHTML='';statusBox.textContent='အလုပ်စတင်နေသည်…';
-try{const body=new FormData();const options={voice:document.getElementById('voice').value,auto_effect:document.getElementById('autoEffect').checked,blur:document.getElementById('blur').value,blur_x:document.getElementById('blurX').value,blur_y:document.getElementById('blurY').value,blur_w:document.getElementById('blurW').value,blur_h:document.getElementById('blurH').value,mirror:document.getElementById('mirror').checked,sub_size:document.getElementById('subSize').value,sub_color:document.getElementById('subColor').value,sub_position:document.getElementById('subPosition').value,sub_x:document.getElementById('subX').value,sub_y:document.getElementById('subY').value,sub_weight:document.getElementById('subWeight').value,sub_outline:document.getElementById('subOutline').value,logo_text:document.getElementById('logoText').value,logo_x:document.getElementById('logoX').value,logo_y:document.getElementById('logoY').value,logo_w:document.getElementById('logoW').value,logo_opacity:document.getElementById('logoOpacity').value,overlay_text:document.getElementById('overlayText').value,subtitles_on:document.getElementById('subtitlesOn').checked,};body.append('url',videoFile?'':videoUrl);body.append('language',document.getElementById('language').value);body.append('gemini_api_key',geminiKey);body.append('groq_api_key',groqKey);Object.entries(options).forEach(([k,v])=>body.append(k,String(v)));if(videoFile)body.append('video',videoFile);const logoFile=document.getElementById('logoImage').files[0];if(logoFile)body.append('logo_image',logoFile);const res=await fetch('/api/jobs',{method:'POST',body});const data=await res.json();if(!res.ok)throw new Error(data.error||'စတင်၍မရပါ');poll(data.id);}catch(err){statusBox.textContent='အမှား: '+err.message;btn.disabled=false;}});
+try{const body=new FormData();const options={voice:document.getElementById('voice').value,auto_effect:document.getElementById('autoEffect').checked,blur:document.getElementById('blur').value,blur_x:document.getElementById('blurX').value,blur_y:document.getElementById('blurY').value,blur_w:document.getElementById('blurW').value,blur_h:document.getElementById('blurH').value,mirror:document.getElementById('mirror').checked,sub_size:document.getElementById('subSize').value,sub_color:document.getElementById('subColor').value,sub_position:document.getElementById('subPosition').value,sub_x:document.getElementById('subX').value,sub_y:document.getElementById('subY').value,sub_weight:document.getElementById('subWeight').value,sub_outline:document.getElementById('subOutline').value,logo_text:document.getElementById('logoText').value,logo_x:document.getElementById('logoX').value,logo_y:document.getElementById('logoY').value,logo_w:document.getElementById('logoW').value,logo_opacity:document.getElementById('logoOpacity').value,overlay_text:document.getElementById('overlayText').value,subtitles_on:document.getElementById('subtitlesOn').checked,};body.append('url',videoFile?'':videoUrl);body.append('language',document.getElementById('language').value);body.append('gemini_api_key',geminiKey);body.append('groq_api_key',groqKey);Object.entries(options).forEach(([k,v])=>body.append(k,String(v)));if(videoFile)body.append('video',videoFile);body.append('recap_script',document.getElementById('recapScript').value.trim());const wevoFile=document.getElementById('wevolabsVoice').files[0];if(wevoFile)body.append('wevolabs_voice',wevoFile);const logoFile=document.getElementById('logoImage').files[0];if(logoFile)body.append('logo_image',logoFile);const res=await fetch('/api/jobs',{method:'POST',body});const data=await res.json();if(!res.ok)throw new Error(data.error||'စတင်၍မရပါ');poll(data.id);}catch(err){statusBox.textContent='အမှား: '+err.message;btn.disabled=false;}});
 async function poll(id){try{const res=await fetch('/api/jobs/'+id);const data=await res.json();if(!res.ok){if(res.status===404){statusBox.textContent='အရင် Job ကို server မှာ မတွေ့တော့ပါ။ Render restart/redeploy ဖြစ်ခဲ့နိုင်ပါတယ်။ Video ရွေးထားဆဲဆိုရင် Generate Final Video ကို ထပ်နှိပ်ပြီး Job အသစ်စတင်ပါ။';links.innerHTML='';btn.disabled=false;showStep(3);return;}throw new Error(data.error||'အခြေအနေမရပါ');}statusBox.textContent=data.message||data.status;
 if(data.status==='done'){links.innerHTML='<button type="button" id="finalBackBtn" class="back" style="width:100%;margin-bottom:12px">← နောက်သို့ — Edit Tools ပြန်သွားရန်</button><h3>🎬 Final Video Preview</h3><video id="finalVideoPreview" controls playsinline preload="metadata" style="display:block;width:100%;max-height:72vh;aspect-ratio:16/9;object-fit:contain;background:#05070d;border:1px solid #31435e;border-radius:14px;margin:10px 0" src="/api/jobs/'+id+'/preview"></video><a class="download" href="/api/jobs/'+id+'/download">⬇️ Final MP4 ဒေါင်းလုဒ်လုပ်ရန်</a>';document.getElementById('finalBackBtn').addEventListener('click',()=>{document.getElementById('jobform').parentElement.style.display='';showStep(2);document.getElementById('editTools')?.scrollIntoView({behavior:'smooth',block:'start'});});document.getElementById('jobform').parentElement.style.display='none';document.querySelectorAll('main > p.muted').forEach(el=>el.style.display='none');document.querySelector('#result h2').textContent='🎬 Final Video Preview';btn.disabled=false;showStep(3);statusBox.scrollIntoView({behavior:'smooth',block:'center'});return;}
 if(data.status==='error'){statusBox.textContent='မအောင်မြင်ပါ: '+data.message;btn.disabled=false;return;}setTimeout(()=>poll(id),3000);
@@ -703,7 +710,7 @@ def update_job(job_id, **fields):
             JOBS[job_id].update(fields)
             _save_job_locked(job_id)
 
-def process_job(job_id, url, language, workdir, gemini_api_key, groq_api_key, options, uploaded=False):
+def process_job(job_id, url, language, workdir, gemini_api_key, groq_api_key, options, uploaded=False, recap_script=""):
     try:
         video = workdir / "source.mp4"
         original_audio = workdir / "source.mp3"
@@ -724,14 +731,21 @@ def process_job(job_id, url, language, workdir, gemini_api_key, groq_api_key, op
         transcript = groq_transcribe(original_audio, groq_api_key)
 
         update_job(job_id, message="Gemini 3.8 Flash ဖြင့် recap စာသားရေးနေသည်…")
-        script = make_recap(transcript, language, gemini_api_key)
+        script = clean_myanmar_text(recap_script) if recap_script else make_recap(transcript, language, gemini_api_key)
         # Gemini/transcription may insert invisible ZWNJ/zero-width characters
         # inside Burmese syllables (e.g. "မ‌ောင်"); remove them before TTS and subtitles.
         script = clean_myanmar_text(script)
         (workdir / "recap.txt").write_text(script, encoding="utf-8")
 
-        update_job(job_id, message="AI Voice ဖန်တီးနေသည်…")
-        synthesize_voice(script, language, voice, options.get("voice", "my-MM-NilarNeural" if language == "my" else "en-US-AriaNeural"), 100)
+        wevolabs_upload = workdir / "wevolabs_voice_upload"
+        if wevolabs_upload.is_file() and wevolabs_upload.stat().st_size:
+            update_job(job_id, message="တင်ထားသော WevoLabs Burmese Voice ကို ပြင်ဆင်နေသည်…")
+            run_command(["ffmpeg", "-y", "-i", str(wevolabs_upload), "-vn", "-codec:a", "libmp3lame", "-q:a", "3", str(voice)], timeout=240)
+            if not voice.is_file() or not voice.stat().st_size:
+                fail("WevoLabs အသံဖိုင်ကို ဖတ်မရပါ။ MP3 သို့မဟုတ် WAV ဖိုင်ကို ပြန်တင်ပါ။")
+        else:
+            update_job(job_id, message="AI Voice ဖန်တီးနေသည်…")
+            synthesize_voice(script, language, voice, options.get("voice", "my-MM-NilarNeural" if language == "my" else "en-US-AriaNeural"), 100)
 
         update_job(job_id, message="AI Voice ကို Video အရှည်နဲ့ အချိန်ညှိနေသည်…")
         fit_voice_to_video(video, voice)
@@ -761,7 +775,7 @@ def process_job(job_id, url, language, workdir, gemini_api_key, groq_api_key, op
     finally:
         # Keep only completed outputs temporarily for download; remove source and intermediates.
         try:
-            for name in ("source.mp4", "source.mp3", "background_music", "logo_image"):
+            for name in ("source.mp4", "source.mp3", "background_music", "logo_image", "wevolabs_voice_upload"):
                 path = workdir / name
                 if path.exists():
                     path.unlink()
@@ -811,6 +825,8 @@ def create_job():
     from flask import request
     uploaded_file = None
     music_file = None
+    wevolabs_voice_file = None
+    recap_script = ""
     if request.is_json:
         data = request.get_json(silent=True) or {}
         url = (data.get("url") or "").strip()
@@ -823,6 +839,10 @@ def create_job():
         language = request.form.get("language", "my")
         gemini_api_key = (request.form.get("gemini_api_key") or "").strip()
         groq_api_key = (request.form.get("groq_api_key") or "").strip()
+        recap_script = (request.form.get("recap_script") or "").strip()
+        wevolabs_voice_file = request.files.get("wevolabs_voice")
+        if wevolabs_voice_file and not wevolabs_voice_file.filename:
+            wevolabs_voice_file = None
         options = {"voice": request.form.get("voice", ""), "voice_speed": request.form.get("voice_speed", "100"), "brightness": request.form.get("brightness", "100"), "contrast": request.form.get("contrast", "100"), "saturation": request.form.get("saturation", "100"), "blur": request.form.get("blur", "0"), "mirror": request.form.get("mirror") == "true", "sub_size": request.form.get("sub_size", "20"), "sub_color": request.form.get("sub_color", "&H00FFFFFF"), "sub_position": request.form.get("sub_position", "bottom"), "logo_text": request.form.get("logo_text", "")[:40], "overlay_text": request.form.get("overlay_text", "")[:100], "music_volume": request.form.get("music_volume", "20"), "auto_effect": request.form.get("auto_effect", "true") == "true", "blur_x": request.form.get("blur_x","50"), "blur_y": request.form.get("blur_y","84"), "blur_w": request.form.get("blur_w","55"), "blur_h": request.form.get("blur_h","12"), "sub_x": request.form.get("sub_x","50"), "sub_y": request.form.get("sub_y","88"), "sub_weight": request.form.get("sub_weight","bold"), "sub_outline": request.form.get("sub_outline","2"), "subtitles_on": request.form.get("subtitles_on","true") == "true", "logo_x": request.form.get("logo_x","90"), "logo_y": request.form.get("logo_y","8"), "logo_opacity": request.form.get("logo_opacity","100")}
         uploaded_file = request.files.get("video")
         if uploaded_file and not uploaded_file.filename:
@@ -842,6 +862,12 @@ def create_job():
         return jsonify({"error": "URL နဲ့ Upload ကို တစ်ခုတည်းသာ ရွေးပါ။"}), 400
     if language not in ("my", "en"):
         return jsonify({"error": "ဘာသာစကားရွေးချယ်မှု မမှန်ပါ။"}), 400
+    if len(recap_script) > 30000:
+        return jsonify({"error": "Recap Script သည် စာလုံး 30,000 ထက် မကျော်ရပါ။"}), 400
+    if wevolabs_voice_file and (language != "my" or not recap_script):
+        return jsonify({"error": "WevoLabs Burmese Voice သုံးရန် မြန်မာဘာသာကို ရွေးပြီး Recap Script အတိအကျကို ထည့်ပါ။"}), 400
+    if wevolabs_voice_file and not (wevolabs_voice_file.filename or "").lower().endswith((".mp3", ".wav")):
+        return jsonify({"error": "WevoLabs အသံဖိုင်ကို MP3 သို့မဟုတ် WAV format ဖြင့် တင်ပါ။"}), 400
     if request.is_json: options = data.get("options") or {}
     if request.is_json: logo_file = None
     allowed_voices = ("my-MM-NilarNeural", "my-MM-ThihaNeural", "en-US-AriaNeural", "en-US-GuyNeural", "en-GB-SoniaNeural")
@@ -921,10 +947,18 @@ def create_job():
                 (workdir / "source.mp4").unlink(missing_ok=True)
             workdir.rmdir()
             return jsonify({"error": "Background Music ဖိုင် အလွတ်ဖြစ်နေသည်။"}), 400
+    if wevolabs_voice_file:
+        wevo_path = workdir / "wevolabs_voice_upload"
+        wevolabs_voice_file.save(wevo_path)
+        if wevo_path.stat().st_size == 0 or wevo_path.stat().st_size > 50 * 1024 * 1024:
+            wevo_path.unlink(missing_ok=True)
+            if uploaded: (workdir / "source.mp4").unlink(missing_ok=True)
+            shutil.rmtree(workdir, ignore_errors=True)
+            return jsonify({"error": "WevoLabs အသံဖိုင်သည် အလွတ်မဖြစ်ရပါ၊ 50 MB အောက် ဖြစ်ရပါမည်။"}), 413
     with JOBS_LOCK:
         JOBS[job_id] = {"status": "queued", "message": "အလုပ်တန်းစီနေသည်…", "created": time.time()}
         _save_job_locked(job_id)
-    thread = threading.Thread(target=process_job, args=(job_id, url, language, workdir, gemini_api_key, groq_api_key, options, uploaded), daemon=True)
+    thread = threading.Thread(target=process_job, args=(job_id, url, language, workdir, gemini_api_key, groq_api_key, options, uploaded, recap_script), daemon=True)
     thread.start()
     return jsonify({"id": job_id, "status": "queued"}), 202
 
