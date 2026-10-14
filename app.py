@@ -450,10 +450,10 @@ def make_recap(transcript, language, api_key):
                     last_error = str(exc)
                     continue
                 if response.status_code == 429:
-                    error_text = response.text[:3000]
-                    retry_match = re.search(r"retry in ([0-9hms. ]+)", error_text, re.IGNORECASE)
-                    retry_hint = (" Google က " + retry_match.group(1).strip() + " နောက်မှ ပြန်စမ်းရန် ပြထားသည်။") if retry_match else " Google AI Studio မှာ usage/quota ကို စစ်ပါ။"
-                    fail("Gemini API quota/rate limit (429) ဖြစ်နေသည်။" + retry_hint + " ခဏစောင့်ပြီး ပြန်စမ်းပါ။")
+                    # A quota may be model-specific. Do not retry the same model
+                    # repeatedly; move directly to the next supported fallback.
+                    last_error = "HTTP 429: " + response.text[:1000]
+                    break
                 if response.status_code == 200:
                     used_model = model
                     break
