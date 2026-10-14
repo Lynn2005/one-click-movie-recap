@@ -725,6 +725,26 @@ def process_job(job_id, url, language, workdir, gemini_api_key, groq_api_key, op
             update_job(job_id, status="running", message="ဗီဒီယိုကို URL မှ ဒေါင်းလုဒ်လုပ်နေသည်…")
             size, _ = download_video(url, video)
             update_job(job_id, message=f"ဗီဒီယိုရရှိပါပြီ ({size // (1024*1024)} MB)။ အသံထုတ်နေသည်…")
+        # CapCut-style timeline trim: cut the source before transcription/voice fitting/render.
+        try:
+            trim_start = max(0.0, float(options.get("trim_start", 0) or 0))
+            trim_end_raw = str(options.get("trim_end", "") or "").strip()
+            trim_end = float(trim_end_raw) if trim_end_raw else 0.0
+        except (TypeError, ValueError):
+            fail("Timeline Trim Start/End အချိန် မမှန်ပါ။")
+        if trim_start > 0 or trim_end > 0:
+            duration_text = run_command(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", str(video)], timeout=30)
+            source_duration = float(duration_text)
+            actual_end = trim_end if trim_end > 0 else source_duration
+            if trim_start >= source_duration or actual_end > source_duration + 0.2 or actual_end <= trim_start:
+                fail("Timeline Trim အချိန် မမှန်ပါ။ Start သည် End ထက်ငယ်ပြီး Video ကြာချိန်အတွင်း ဖြစ်ရပါမည်။")
+            if trim_start > 0 or actual_end < source_duration - 0.2:
+                update_job(job_id, message="Timeline Trim ကို အသုံးပြုပြီး Video ကို ဖြတ်နေသည်…")
+                trimmed = workdir / "trimmed_source.mp4"
+                run_command(["ffmpeg", "-y", "-ss", f"{trim_start:.3f}", "-i", str(video), "-t", f"{actual_end-trim_start:.3f}", "-map", "0:v:0", "-map", "0:a?", "-c:v", "libx264", "-preset", "ultrafast", "-crf", "22", "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", str(trimmed)], timeout=300)
+                if not trimmed.is_file() or not trimmed.stat().st_size:
+                    fail("Timeline Trim လုပ်၍မရပါ။ Start/End အချိန်ကို ပြန်စစ်ပါ။")
+                os.replace(trimmed, video)
         if recap_script:
             update_job(job_id, message="ထည့်ပေးထားသော Recap Script ကို အသုံးပြုနေသည်…")
             script = clean_myanmar_text(recap_script)
