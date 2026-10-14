@@ -137,7 +137,7 @@ button,.download{display:inline-flex;align-items:center;justify-content:center;g
 button:hover,.download:hover{filter:brightness(1.07);box-shadow:0 5px 18px color-mix(in srgb,var(--button) 20%,transparent)}button:active{transform:translateY(1px)}button:disabled{opacity:.55;cursor:wait;box-shadow:none}
 .key-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px}
 .status{padding:14px;border-radius:12px;background:var(--status);border:1px solid var(--border);white-space:pre-wrap;overflow-wrap:anywhere}
-.batch-item{border:1px solid var(--border);border-radius:12px;padding:12px;margin-top:10px;background:var(--panel2)}.batch-item h3{font-size:13px;margin:0 0 7px;overflow-wrap:anywhere}.batch-state{font-size:12px;color:var(--muted);white-space:pre-wrap}.batch-item .download{margin-top:9px}.batch-progress{height:5px;background:var(--border);border-radius:9px;overflow:hidden;margin-top:8px}.batch-progress span{display:block;width:0;height:100%;background:var(--accent2);transition:width .2s}
+.library-card{border:1px solid var(--border);border-radius:14px;padding:12px;margin-top:12px;background:var(--panel2)}.library-card h3{font-size:14px;margin:0 0 6px;overflow-wrap:anywhere}.library-meta{font-size:12px;color:var(--muted);margin-bottom:8px}.library-video{display:block;width:100%;max-height:360px;aspect-ratio:16/9;object-fit:contain;background:#05070d;border-radius:10px;margin:8px 0}.library-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}.library-actions .download{margin:0}.library-empty{padding:16px;border:1px dashed var(--border);border-radius:12px;color:var(--muted);font-size:13px}.batch-item{border:1px solid var(--border);border-radius:12px;padding:12px;margin-top:10px;background:var(--panel2)}.batch-item h3{font-size:13px;margin:0 0 7px;overflow-wrap:anywhere}.batch-state{font-size:12px;color:var(--muted);white-space:pre-wrap}.batch-item .download{margin-top:9px}.batch-progress{height:5px;background:var(--border);border-radius:9px;overflow:hidden;margin-top:8px}.batch-progress span{display:block;width:0;height:100%;background:var(--accent2);transition:width .2s}
 .settings-wrap{position:fixed;z-index:20;inset:0;background:#020611b8;backdrop-filter:blur(8px);display:flex;justify-content:flex-end;align-items:stretch;padding:14px}
 .settings-card{width:min(420px,100%);max-height:100%;overflow:auto;background:var(--panel);border:1px solid var(--border);border-radius:20px;padding:22px;box-shadow:0 24px 80px #0007}
 .settings-head{display:flex;justify-content:space-between;align-items:center;gap:10px}.settings-head h2{margin:0}.close-btn{width:auto;margin:0;padding:7px 11px;background:var(--panel2);border-color:var(--border);color:var(--text);min-height:36px}
@@ -166,6 +166,12 @@ a{color:#9fbaff}
   <p class="muted small" id="batchSelection">Video မရွေးရသေးပါ။ တစ်ကားလျှင် 80 MB အောက်၊ 10 မိနစ်အောက် ဖြစ်ရပါမည်။</p>
   <button id="batchStart" type="button">🎬 Generate Multiple Recaps</button>
   <div id="batchResults" class="hidden" aria-live="polite" style="margin-top:14px"></div>
+</section>
+
+<section class="panel" id="savedLibrary">
+  <div class="step-head"><span class="step-number">📚</span><div><div class="step-title">Saved Video Library</div><div class="step-desc">Final MP4 အားလုံးကို သိမ်းဆည်းထားပြီး Server ပြန်စတင်ပြီးနောက်လည်း ပြန်ဖွင့်/ဒေါင်းလုဒ်လုပ်နိုင်သည်</div></div></div>
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="small muted" id="libraryCount">သိမ်းထားသောဗီဒီယိုများကို စစ်ဆေးနေသည်…</span><button id="refreshLibrary" type="button" style="width:auto;margin:0;padding:9px 12px">↻ Refresh</button></div>
+  <div id="libraryItems" style="margin-top:12px" aria-live="polite"></div>
 </section>
 
 <div class="settings-wrap hidden" id="settingsWrap"><div class="settings-card"><div class="settings-head"><h2>⚙️ API Keys</h2><button class="close-btn" id="closeSettings" type="button">✕</button></div>
@@ -281,6 +287,9 @@ function loadSavedKeys(){try{geminiInput.value=localStorage.getItem('oneclick_ge
 document.getElementById('saveKeys').addEventListener('click',()=>{const g=geminiInput.value.trim(),q=groqInput.value.trim();if(!g||!q){keyStatus.textContent='Gemini နဲ့ Groq Key နှစ်ခုလုံး ထည့်ပါ။';return;}try{localStorage.setItem('oneclick_gemini_key',g);localStorage.setItem('oneclick_groq_key',q);keyStatus.textContent='Key နှစ်ခုလုံးကို ဒီ Browser ထဲမှာ Save လုပ်ပြီးပါပြီ။';}catch(e){keyStatus.textContent='Save မလုပ်နိုင်ပါ။ Browser storage setting ကို စစ်ပါ။';}});
 document.getElementById('clearKeys').addEventListener('click',()=>{try{localStorage.removeItem('oneclick_gemini_key');localStorage.removeItem('oneclick_groq_key');}catch(e){}geminiInput.value='';groqInput.value='';keyStatus.textContent='Browser ထဲက Saved Keys ကို ဖျက်ပြီးပါပြီ။';});
 loadSavedKeys();
+const libraryItems=document.getElementById('libraryItems'),libraryCount=document.getElementById('libraryCount');
+async function loadVideoLibrary(){libraryCount.textContent='Library ကို စစ်ဆေးနေသည်…';try{const response=await fetch('/api/library',{cache:'no-store'});const data=await response.json();if(!response.ok)throw new Error(data.error||'Library မရပါ');libraryItems.replaceChildren();libraryCount.textContent='စုစုပေါင်း '+data.count+' ခု';if(!data.videos.length){const empty=document.createElement('div');empty.className='library-empty';empty.textContent='Final MP4 မရှိသေးပါ။ Recap ပြီးသွားလျှင် ဒီနေရာတွင် ပြန်တွေ့နိုင်ပါမည်။';libraryItems.appendChild(empty);return;}for(const video of data.videos){const card=document.createElement('article');card.className='library-card';const title=document.createElement('h3');title.textContent=video.title||'Movie Recap';const meta=document.createElement('div');meta.className='library-meta';const date=new Date(Number(video.created||0)*1000);const size=(Number(video.size_bytes||0)/1024/1024).toFixed(1);meta.textContent=(Number.isNaN(date.getTime())?'':date.toLocaleString())+' · '+size+' MB';const player=document.createElement('video');player.className='library-video';player.controls=true;player.playsInline=true;player.preload='metadata';player.src=video.preview_url;const actions=document.createElement('div');actions.className='library-actions';const download=document.createElement('a');download.className='download';download.href=video.download_url;download.textContent='⬇️ Final MP4 Download';const open=document.createElement('a');open.className='download';open.href=video.preview_url;open.target='_blank';open.rel='noopener';open.textContent='▶ Open Video';actions.append(download,open);card.append(title,meta,player,actions);libraryItems.appendChild(card);}}catch(error){libraryCount.textContent='Library ကို မဖတ်နိုင်ပါ';libraryItems.replaceChildren();const message=document.createElement('div');message.className='library-empty';message.textContent=error.message+' — Disk mount နဲ့ MOVIE_RECAP_DATA_DIR ကို စစ်ပါ။';libraryItems.appendChild(message);}}
+document.getElementById('refreshLibrary').addEventListener('click',loadVideoLibrary);
 const batchFilesInput=document.getElementById('batchFiles'),batchStart=document.getElementById('batchStart'),batchResults=document.getElementById('batchResults'),batchSelection=document.getElementById('batchSelection');
 batchFilesInput.addEventListener('change',()=>{const files=Array.from(batchFilesInput.files||[]);batchSelection.textContent=files.length?files.length+' movie(s) selected · '+files.map(f=>f.name).join(', '):'Video မရွေးရသေးပါ။ တစ်ကားလျှင် 80 MB အောက်၊ 10 မိနစ်အောက် ဖြစ်ရပါမည်။';});
 function batchOptions(){return {voice:document.getElementById('voice').value,auto_effect:document.getElementById('autoEffect').checked,blur:document.getElementById('blur').value,blur_x:document.getElementById('blurX').value,blur_y:document.getElementById('blurY').value,blur_w:document.getElementById('blurW').value,blur_h:document.getElementById('blurH').value,mirror:document.getElementById('mirror').checked,sub_size:document.getElementById('subSize').value,sub_color:document.getElementById('subColor').value,sub_position:document.getElementById('subPosition').value,sub_x:document.getElementById('subX').value,sub_y:document.getElementById('subY').value,sub_weight:document.getElementById('subWeight').value,sub_outline:document.getElementById('subOutline').value,logo_text:document.getElementById('logoText').value,logo_x:document.getElementById('logoX').value,logo_y:document.getElementById('logoY').value,logo_w:document.getElementById('logoW').value,logo_opacity:document.getElementById('logoOpacity').value,overlay_text:document.getElementById('overlayText').value,subtitles_on:document.getElementById('subtitlesOn').checked};}
@@ -294,6 +303,7 @@ async function poll(id){try{const res=await fetch('/api/jobs/'+id);const data=aw
 if(data.status==='done'){links.innerHTML='<button type="button" id="finalBackBtn" class="back" style="width:100%;margin-bottom:12px">← နောက်သို့ — Edit Tools ပြန်သွားရန်</button><h3>🎬 Final Video Preview</h3><video id="finalVideoPreview" controls playsinline preload="metadata" style="display:block;width:100%;max-height:72vh;aspect-ratio:16/9;object-fit:contain;background:#05070d;border:1px solid #31435e;border-radius:14px;margin:10px 0" src="/api/jobs/'+id+'/preview"></video><a class="download" href="/api/jobs/'+id+'/download">⬇️ Final MP4 ဒေါင်းလုဒ်လုပ်ရန်</a>';document.getElementById('finalBackBtn').addEventListener('click',()=>{document.getElementById('jobform').parentElement.style.display='';showStep(2);document.getElementById('editTools')?.scrollIntoView({behavior:'smooth',block:'start'});});document.getElementById('jobform').parentElement.style.display='none';document.querySelectorAll('main > p.muted').forEach(el=>el.style.display='none');document.querySelector('#result h2').textContent='🎬 Final Video Preview';btn.disabled=false;showStep(3);statusBox.scrollIntoView({behavior:'smooth',block:'center'});return;}
 if(data.status==='error'){statusBox.textContent='မအောင်မြင်ပါ: '+data.message;btn.disabled=false;return;}setTimeout(()=>poll(id),3000);
 }catch(err){statusBox.textContent='အခြေအနေစစ်ရာတွင် ပြဿနာ: '+err.message;btn.disabled=false;}}
+loadVideoLibrary();
 </script></body></html>
 """
 
@@ -835,8 +845,8 @@ def process_job(job_id, url, language, workdir, gemini_api_key, groq_api_key, op
         update_job(job_id, message="နောက်ဆုံး MP4 ကို တည်ဆောက်နေသည်။ ခဏစောင့်ပါ…")
         render_video(video, voice, subtitles, output, options, music_path, logo_path)
         save_latest_artifacts(workdir)
-        update_job(job_id, status="done", message="ပြီးပါပြီ။ MP4, Script, SRT နဲ့ AI Voice ကို ဒေါင်းလုဒ်လုပ်နိုင်ပါပြီ။",
-                   output=str(output), script=str(workdir / "recap.txt"), srt=str(srt_file), voice=str(voice), finished=time.time())
+        update_job(job_id, status="done", message="ပြီးပါပြီ။ Final MP4 ကို Saved Video Library ထဲတွင် သိမ်းထားပါပြီ။",
+                   output=str(output), script=str(workdir / "recap.txt"), srt=str(srt_file), voice=str(voice), finished=time.time(), title=JOBS.get(job_id, {}).get("title") or "Movie Recap")
     except Exception as exc:
         update_job(job_id, status="error", message=str(exc)[:1500], finished=time.time())
     finally:
@@ -1023,11 +1033,38 @@ def create_job():
             shutil.rmtree(workdir, ignore_errors=True)
             return jsonify({"error": "WevoLabs အသံဖိုင်သည် အလွတ်မဖြစ်ရပါ၊ 50 MB အောက် ဖြစ်ရပါမည်။"}), 413
     with JOBS_LOCK:
-        JOBS[job_id] = {"status": "queued", "message": "အလုပ်တန်းစီနေသည်…", "created": time.time()}
+        JOBS[job_id] = {"status": "queued", "message": "အလုပ်တန်းစီနေသည်…", "created": time.time(), "title": (Path(uploaded_file.filename).name if uploaded_file and uploaded_file.filename else (Path(urlparse(url).path).name or "Movie Recap"))[:180]}
         _save_job_locked(job_id)
     thread = threading.Thread(target=process_job, args=(job_id, url, language, workdir, gemini_api_key, groq_api_key, options, uploaded, recap_script), daemon=True)
     thread.start()
     return jsonify({"id": job_id, "status": "queued"}), 202
+
+@app.get("/api/library")
+def video_library():
+    """List all completed final MP4s whose files remain on the configured data volume."""
+    items = []
+    with JOBS_LOCK:
+        snapshot = [(job_id, dict(job)) for job_id, job in JOBS.items()]
+    for job_id, job in snapshot:
+        if job.get("status") != "done":
+            continue
+        path = Path(job.get("output", ""))
+        if not path.is_file() or path.parent.parent != OUTPUT_ROOT or path.suffix.lower() != ".mp4":
+            continue
+        try:
+            stat = path.stat()
+        except OSError:
+            continue
+        items.append({
+            "id": job_id,
+            "title": str(job.get("title") or "Movie Recap")[:180],
+            "created": job.get("finished") or job.get("created") or stat.st_mtime,
+            "size_bytes": stat.st_size,
+            "preview_url": f"/api/jobs/{job_id}/preview",
+            "download_url": f"/api/jobs/{job_id}/download",
+        })
+    items.sort(key=lambda item: float(item["created"] or 0), reverse=True)
+    return jsonify({"videos": items, "count": len(items)})
 
 @app.get("/api/jobs/<job_id>")
 def job_status(job_id):
