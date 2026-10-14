@@ -16,7 +16,7 @@ from urllib.parse import urlparse
 
 import edge_tts
 import requests
-from flask import Flask, jsonify, render_template_string, send_file, abort
+from flask import Flask, jsonify, render_template_string, send_file, abort, redirect
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 82 * 1024 * 1024
@@ -42,8 +42,94 @@ LATEST_ROOT = DATA_ROOT / "latest-artifacts"
 LATEST_ROOT.mkdir(parents=True, exist_ok=True)
 JOB_DB = DATA_ROOT / "jobs.sqlite3"
 
+def _r2_configured():
+    return bool(os.getenv("R2_ACCOUNT_ID") and os.getenv("R2_ACCESS_KEY_ID") and os.getenv("R2_SECRET_ACCESS_KEY") and os.getenv("R2_BUCKET_NAME"))
+
+def _r2_client():
+    if not _r2_configured():
+        return None
+    import boto3
+    from botocore.config import Config
+    return boto3.client(
+        "s3",
+        endpoint_url="https://" + os.environ["R2_ACCOUNT_ID"].strip() + ".r2.cloudflarestorage.com",
+        aws_access_key_id=os.environ["R2_ACCESS_KEY_ID"],
+        aws_secret_access_key=os.environ["R2_SECRET_ACCESS_KEY"],
+        region_name="auto",
+        config=Config(signature_version="s3v4", retries={"max_attempts": 3, "mode": "standard"}),
+    )
+
+def _r2_video_key(job_id):
+    return "jobs/" + str(job_id) + "/movie_recap.mp4"
+
+def _r2_metadata_key(job_id):
+    return "jobs/" + str(job_id) + "/job.json"
+
+def _r2_save_job(job_id, job):
+    client = _r2_client()
+    if client is None:
+        return False
+    client.put_object(
+        Bucket=os.environ["R2_BUCKET_NAME"],
+        Key=_r2_metadata_key(job_id),
+        Body=json.dumps(job, ensure_ascii=False).encode("utf-8"),
+        ContentType="application/json; charset=utf-8",
+    )
+    return True
+
+def _r2_get_job(job_id):
+    client = _r2_client()
+    if client is None:
+        return None
+    try:
+        obj = client.get_object(Bucket=os.environ["R2_BUCKET_NAME"], Key=_r2_metadata_key(job_id))
+        return json.loads(obj["Body"].read().decode("utf-8"))
+    except Exception:
+        return None
+
+def _r2_saved_jobs():
+    client = _r2_client()
+    if client is None:
+        return []
+    found = []
+    try:
+        paginator = client.get_paginator("list_objects_v2")
+        for page in paginator.paginate(Bucket=os.environ["R2_BUCKET_NAME"], Prefix="jobs/"):
+            for item in page.get("Contents", []):
+                key = item.get("Key", "")
+                if key.endswith("/job.json"):
+                    job_id = key[len("jobs/"):-len("/job.json")]
+                    job = _r2_get_job(job_id)
+                    if job:
+                        found.append((job_id, job))
+    except Exception:
+        return found
+    return found
+
+def _r2_upload_video(job_id, path):
+    client = _r2_client()
+    if client is None:
+        return False
+    client.upload_file(
+        str(path),
+        os.environ["R2_BUCKET_NAME"],
+        _r2_video_key(job_id),
+        ExtraArgs={"ContentType": "video/mp4"},
+    )
+    return True
+
+def _r2_video_url(job_id):
+    client = _r2_client()
+    if client is None:
+        return None
+    return client.generate_presigned_url(
+        "get_object",
+        Params={"Bucket": os.environ["R2_BUCKET_NAME"], "Key": _r2_video_key(job_id)},
+        ExpiresIn=3600,
+    )
+
 def _get_final_video_path(job_id, job=None):
-    """Return the final MP4 from the app data directory only; no cloud storage."""
+    """Return a local MP4 if present; cloud-only jobs are served through signed R2 URLs."""
     path = OUTPUT_ROOT / str(job_id) / "movie_recap.mp4"
     return path if path.is_file() else None
 
@@ -65,6 +151,11 @@ def _save_job_locked(job_id):
     except (OSError, sqlite3.Error):
         # Keep the app usable even if the configured storage is temporarily unavailable.
         pass
+    # R2 is the durable source of truth when Cloudflare credentials are configured.
+    try:
+        _r2_save_job(job_id, job)
+    except Exception:
+        pass
 
 def _load_jobs():
     try:
@@ -82,6 +173,17 @@ def _load_jobs():
                 continue
     except (OSError, sqlite3.Error):
         pass
+    # Restore job metadata from R2 after a Render restart/redeploy.
+    for job_id, job in _r2_saved_jobs():
+        try:
+            if job.get("status") in ("queued", "running"):
+                job.update(status="error", message="Server restart ဖြစ်သွားသောကြောင့် အရင်အလုပ် ဆက်မလုပ်နိုင်ပါ။ Video ကို ပြန်တင်ပြီး Generate Final Video ကို ထပ်နှိပ်ပါ။", finished=time.time())
+                _r2_save_job(job_id, job)
+            JOBS[job_id] = job
+            with _db_connect() as connection:
+                connection.execute("INSERT INTO jobs(id, payload) VALUES(?, ?) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload", (job_id, json.dumps(job, ensure_ascii=False)))
+        except Exception:
+            continue
 
 _load_jobs()
 
@@ -842,8 +944,15 @@ def process_job(job_id, url, language, workdir, gemini_api_key, groq_api_key, op
         render_video(video, voice, output, options, music_path, progress_callback=lambda percent: update_job(job_id, progress=percent))
         save_latest_artifacts(workdir)
         title = JOBS.get(job_id, {}).get("title") or "Movie Recap"
+        cloud_video_saved = False
+        if _r2_configured():
+            update_job(job_id, progress=95, message="Cloudflare R2 သို့ Final Video သိမ်းနေသည်...")
+            _r2_upload_video(job_id, output)
+            cloud_video_saved = True
         update_job(job_id, status="done", progress=100, message="",
-                   output=str(output), script=str(workdir / "recap.txt"), srt=str(srt_file), voice=str(voice), finished=time.time(), title=title)
+                   output=str(output), script=str(workdir / "recap.txt"), srt=str(srt_file), voice=str(voice), finished=time.time(), title=title,
+                   r2_video_key=_r2_video_key(job_id) if cloud_video_saved else None,
+                   video_size=output.stat().st_size)
     except Exception as exc:
         update_job(job_id, status="error", progress=0, message=str(exc)[:1500], finished=time.time())
     finally:
@@ -896,30 +1005,40 @@ def health():
 
 @app.get("/api/jobs")
 def list_jobs():
-    """List completed videos saved on the server so they can be reopened after a page reload."""
+    """List completed videos stored locally or in Cloudflare R2."""
     jobs = []
+    seen = set()
+    rows = []
     try:
         with _db_connect() as connection:
             rows = connection.execute("SELECT id, payload FROM jobs ORDER BY rowid DESC").fetchall()
-        for job_id, payload in rows:
-            try:
-                job = json.loads(payload)
-            except (TypeError, ValueError):
-                continue
-            path = _get_final_video_path(job_id, job)
-            if job.get("status") == "done" and path and path.is_file():
-                jobs.append({
-                    "id": job_id,
-                    "title": str(job.get("title") or "Movie Recap")[:180],
-                    "created": job.get("created"),
-                    "finished": job.get("finished"),
-                    "size": path.stat().st_size,
-                    "preview_url": "/api/jobs/" + job_id + "/preview",
-                    "download_url": "/api/jobs/" + job_id + "/download",
-                })
     except (OSError, sqlite3.Error):
         pass
-    return jsonify({"jobs": jobs, "persistent_storage_configured": bool(os.getenv("MOVIE_RECAP_DATA_DIR") or (os.getenv("RENDER") and Path("/var/data").is_dir()))})
+    for job_id, payload in rows:
+        try:
+            job = json.loads(payload)
+        except (TypeError, ValueError):
+            continue
+        path = _get_final_video_path(job_id, job)
+        cloud_saved = bool(job.get("r2_video_key"))
+        if job.get("status") == "done" and ((path and path.is_file()) or cloud_saved):
+            jobs.append({"id": job_id, "title": str(job.get("title") or "Movie Recap")[:180],
+                         "created": job.get("created"), "finished": job.get("finished"),
+                         "size": path.stat().st_size if path and path.is_file() else job.get("video_size", 0),
+                         "preview_url": "/api/jobs/" + job_id + "/preview",
+                         "download_url": "/api/jobs/" + job_id + "/download"})
+            seen.add(job_id)
+    for job_id, job in _r2_saved_jobs():
+        if job_id in seen:
+            continue
+        if job.get("status") == "done" and job.get("r2_video_key"):
+            jobs.append({"id": job_id, "title": str(job.get("title") or "Movie Recap")[:180],
+                         "created": job.get("created"), "finished": job.get("finished"),
+                         "size": job.get("video_size", 0),
+                         "preview_url": "/api/jobs/" + job_id + "/preview",
+                         "download_url": "/api/jobs/" + job_id + "/download"})
+    jobs.sort(key=lambda item: item.get("finished") or item.get("created") or 0, reverse=True)
+    return jsonify({"jobs": jobs[:100], "persistent_storage_configured": _r2_configured() or bool(os.getenv("MOVIE_RECAP_DATA_DIR") or (os.getenv("RENDER") and Path("/var/data").is_dir())), "cloudflare_r2_configured": _r2_configured()})
 
 @app.post("/api/jobs")
 def create_job():
@@ -1024,8 +1143,7 @@ def create_job():
 
 @app.get("/api/jobs/<job_id>")
 def job_status(job_id):
-    # Always read the shared SQLite state first: Render may serve polling requests
-    # from a different worker than the one running the background thread.
+    # Read local SQLite first, then recover the durable job record from R2.
     recovered = None
     try:
         with _db_connect() as connection:
@@ -1035,6 +1153,8 @@ def job_status(job_id):
     except (OSError, sqlite3.Error, TypeError, ValueError, json.JSONDecodeError):
         recovered = None
 
+    if not recovered:
+        recovered = _r2_get_job(job_id)
     if recovered:
         final_path = _get_final_video_path(job_id, recovered)
         if final_path and final_path.is_file():
@@ -1067,6 +1187,10 @@ def download_job(job_id):
         abort(404)
     path = _get_final_video_path(job_id, job)
     if path is None:
+        if job.get("r2_video_key"):
+            signed = _r2_video_url(job_id)
+            if signed:
+                return redirect(signed, code=302)
         abort(404)
     return send_file(path, as_attachment=True, download_name="movie_recap.mp4", mimetype="video/mp4", conditional=True)
 
@@ -1078,6 +1202,10 @@ def preview_job(job_id):
         abort(404)
     path = _get_final_video_path(job_id, job)
     if path is None:
+        if job.get("r2_video_key"):
+            signed = _r2_video_url(job_id)
+            if signed:
+                return redirect(signed, code=302)
         abort(404)
     response = send_file(path, as_attachment=False, download_name="movie_recap.mp4", mimetype="video/mp4", conditional=True)
     response.headers["Accept-Ranges"] = "bytes"
