@@ -987,15 +987,9 @@ def job_status(job_id):
         final_path = _get_final_video_path(job_id, recovered)
         if final_path and final_path.is_file():
             recovered.update(status="done", progress=100, message="ပြီးပါပြီ။ Final Video ကို ကြည့်ရှု/ဒေါင်းလုဒ်လုပ်နိုင်ပါပြီ။", finished=recovered.get("finished") or time.time())
-        elif recovered.get("status") in ("queued", "running"):
-            # If this worker's in-memory job is newer, don't mistake another worker's
-            # queued snapshot for a restart. SQLite is the shared progress source.
-            with JOBS_LOCK:
-                local_job = JOBS.get(job_id)
-            if local_job and local_job.get("status") in ("running", "done", "error"):
-                recovered = local_job
-            else:
-                recovered.update(status="error", message="Server process ပြန်စတင်သွားသောကြောင့် လုပ်ဆောင်နေဆဲ Job ကို ဆက်မလုပ်နိုင်တော့ပါ။ Video ကို ပြန်တင်ပြီး Generate Final Video ကို ထပ်နှိပ်ပါ။", finished=time.time())
+        # For active jobs, trust the shared SQLite payload. Startup recovery
+        # already marks interrupted jobs as errors; do not mark a live job failed
+        # merely because this HTTP request reached a different worker.
         with JOBS_LOCK:
             JOBS[job_id] = recovered
             _save_job_locked(job_id)
