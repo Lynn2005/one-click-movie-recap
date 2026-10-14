@@ -819,7 +819,7 @@ def synthesize_voice(script, language, audio_path, voice, voice_speed=100, bound
         if len(audio_parts) != len(parts):
             fail("AI Voice ဖန်တီးမရပါ။ Myanmar TTS က အသံမပေးပါ။ ခဏနောက်ပြန်စမ်းပါ။ Error: " + str(last_error)[:250])
         concat_file = temp_dir / "concat.txt"
-        concat_file.write_text("".join("file '" + str(p).replace("'", "'\\''") + "'\\n" for p in audio_parts), encoding="utf-8")
+        concat_file.write_text("".join("file '" + str(p).replace("'", "'\\''") + "'\n" for p in audio_parts), encoding="utf-8")
         run_command(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(concat_file),
                      "-c:a", "libmp3lame", "-q:a", "3", str(audio_path)], timeout=300)
         if not audio_path.exists() or audio_path.stat().st_size == 0:
