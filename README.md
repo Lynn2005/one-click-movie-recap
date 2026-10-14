@@ -2,14 +2,17 @@
 
 A small Flask web app for creating a recap video from a **direct video-file URL**.
 
-## Features
+## Main workflow
 
-- Four-step mobile wizard: Video Upload → Voice & Language → Edit Tools → Final Video
-- Movie/video URL input or direct upload from the phone in a mobile-friendly web page
+**MP4 Upload → Original Transcript → Burmese Recap Script → Burmese AI Voice → Subtitle Timing → Final MP4**
+
+- Three-step mobile UI: MP4 Upload → Burmese AI Voice settings → Final MP4
+- Direct video URL input or upload from a phone
 - Speech-to-text using Groq Whisper
-- Recap script generation using **Gemini 3.8 Flash only** (`gemini-3.8-flash`)
-- Burmese narration using Microsoft Edge TTS (Nilar female or Thiha male)
-- A separate SRT subtitle file is generated for download; subtitles are not burned into the final MP4
+- Burmese recap script generation using Gemini
+- Burmese narration using Microsoft Edge TTS; default voice is Thiha (male), with Nilar (female) available
+- Subtitle SRT is generated and timed against the generated voice; it is provided separately and is not burned into the MP4 by default
+- The source video picture is retained, and the generated Burmese narration replaces the original audio
 - No app login/password and no Streamlit
 - Website API Key Settings with Save/Clear buttons
 - API keys are saved in the current browser's localStorage and sent over HTTPS only when a recap job starts; the server does not write them to repository files or persistent storage
