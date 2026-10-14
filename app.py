@@ -14,7 +14,6 @@ import uuid
 from pathlib import Path
 from urllib.parse import urlparse
 
-import edge_tts
 import requests
 from flask import Flask, jsonify, render_template_string, send_file, abort, redirect
 
@@ -318,7 +317,7 @@ main{padding-left:max(0px,env(safe-area-inset-left));padding-right:max(0px,env(s
 <p class="muted small" id="multiUploadHint">Video အများအပြားကို တစ်ခါတည်းရွေးနိုင်သည်။ အများဆုံး ၅ ဖိုင်၊ တစ်ဖိုင်လျှင် 80 MB အထိ။ ဖိုင်တစ်ခုစီကို သီးခြား Job အဖြစ် တစ်ပြိုင်နက် Processing လုပ်မည်။</p>
 <div class="wizard-nav"><button type="button" class="next-step" data-next="1">Next → Voice</button></div></section>
 <section class="wizard-step" data-step="1"><div class="step-head"><span class="step-number">2</span><div><div class="step-title">မြန်မာ AI Voice</div><div class="step-desc">မူရင်းအသံမှ စာသားထုတ်၊ မြန်မာ Recap ပြုလုပ်ပြီး AI Voice ထုတ်မည်</div></div></div>
-<div class="option-grid"><div><label for="language">Recap ဘာသာ</label><select id="language" name="language"><option value="my">မြန်မာ</option><option value="en">English</option></select></div><div><label for="voice">Voice</label><select id="voice" name="voice"><option value="my-MM-ThihaNeural" selected>မြန်မာ Thiha (ယောက်ျားသံ)</option><option value="my-MM-NilarNeural">မြန်မာ Nilar (မိန်းမသံ)</option></select></div><div><label for="voiceSpeed">AI Voice ပြောနှုန်း</label><select id="voiceSpeed" name="voice_speed"><option value="100">ပုံမှန် (100%)</option><option value="110">နည်းနည်းမြန် (110%)</option><option value="120" selected>မြန်မြန် (120%)</option><option value="130">အမြန်ဆုံး (130%)</option></select><p class="muted small">Default ကို ၂၀% မြန်အောင်ထားပြီး Voice ကို Video အရှည်အတိုင်း အတင်းမနှေးစေပါ။</p></div><div><label for="subtitlePace">SRT စာတန်းပြောနှုန်း (၃ စက္ကန့်ခန့်)</label><select id="subtitlePace" name="subtitle_pace"><option value="slow">ဖြည်းဖြည်း၊ ရှင်းရှင်း — ၁၀–၁၅ လုံး</option><option value="normal" selected>ပုံမှန် Recap — ၁၅–၂၅ လုံး</option><option value="fast">မြန်မြန်ပြော — ၂၅–၃၅ လုံး</option></select></div></div>
+<div class="option-grid"><div><label for="language">Recap ဘာသာ</label><select id="language" name="language"><option value="my">မြန်မာ</option><option value="en">English</option></select></div><div><label for="voice">Voice</label><select id="voice" name="voice"><option value="Puck" selected>Gemini Puck (ယောက်ျားသံ စမ်းသပ်ရန်)</option><option value="Charon">Gemini Charon (နက်ရှိုင်းသောအသံ)</option><option value="Kore">Gemini Kore</option><option value="Fenrir">Gemini Fenrir</option></select></div><div><label for="voiceSpeed">AI Voice ပြောနှုန်း</label><select id="voiceSpeed" name="voice_speed"><option value="100">ပုံမှန် (100%)</option><option value="110">နည်းနည်းမြန် (110%)</option><option value="120" selected>မြန်မြန် (120%)</option><option value="130">အမြန်ဆုံး (130%)</option></select><p class="muted small">Default ကို ၂၀% မြန်အောင်ထားပြီး Voice ကို Video အရှည်အတိုင်း အတင်းမနှေးစေပါ။</p></div><div><label for="subtitlePace">SRT စာတန်းပြောနှုန်း (၃ စက္ကန့်ခန့်)</label><select id="subtitlePace" name="subtitle_pace"><option value="slow">ဖြည်းဖြည်း၊ ရှင်းရှင်း — ၁၀–၁၅ လုံး</option><option value="normal" selected>ပုံမှန် Recap — ၁၅–၂၅ လုံး</option><option value="fast">မြန်မြန်ပြော — ၂၅–၃၅ လုံး</option></select></div></div>
 
 <div style="margin-top:14px;padding:14px;border:1px solid var(--border);border-radius:13px;background:var(--panel2)">
 
@@ -775,67 +774,133 @@ def make_recap(transcript, language, api_key):
         sections.append(section)
     return "\n\n".join(sections)
 
-def synthesize_voice(script, language, audio_path, voice, voice_speed=100, boundaries_path=None):
-    """Generate Burmese narration in short requests, retrying with a fallback Myanmar voice."""
-    import asyncio
+def _gemini_tts_chunk(part, api_key, voice, speed):
+    """Call the official Gemini TTS Interactions REST API and return complete WAV bytes."""
+    if not api_key:
+        raise RuntimeError("Gemini API Key မရှိပါ။ Website API Key Settings မှာ Gemini Key ထည့်ပါ။")
+    pace = {
+        70: "slow and deliberate", 80: "slightly slow and clear", 90: "natural and clear",
+        100: "natural conversational pace", 110: "moderately brisk but clear",
+        120: "brisk, fluent, and clear", 130: "fast but still clearly articulated",
+    }
+    speed = max(70, min(130, int(speed)))
+    closest = min(pace, key=lambda value: abs(value - speed))
+    style = ("Speak in Burmese (Myanmar) as a single adult male movie-recap narrator. "
+             + pace[closest] + ". Keep syllables natural; do not draw out vowels or add long pauses. "
+             "Read the provided text verbatim without omitting, paraphrasing, or adding words.")
+    payload = {
+        "model": "gemini-3.8-flash-tts",
+        "input": [{"type": "user_input", "content": [{
+            "type": "text", "text": part,
+            "annotations": [{"type": "speech_metadata", "style": style}],
+        }]}],
+        "response_format": {"type": "audio"},
+        "generation_config": {"speech_config": [{"voice": voice or "Puck"}]},
+    }
+    last_error = ""
+    for attempt, delay in enumerate((0, 2, 5)):
+        if delay:
+            time.sleep(delay)
+        try:
+            response = requests.post(
+                "https://generativelanguage.googleapis.com/v1beta/interactions",
+                headers={"x-goog-api-key": api_key, "Content-Type": "application/json"},
+                json=payload, timeout=180,
+            )
+        except requests.RequestException as exc:
+            last_error = str(exc)
+            continue
+        if response.status_code == 200:
+            try:
+                data = response.json()
+                audio_data = (data.get("output_audio") or {}).get("data")
+                if not audio_data:
+                    for step in reversed(data.get("steps") or []):
+                        for item in reversed(step.get("content") or []):
+                            if item.get("type") == "audio" and item.get("data"):
+                                audio_data = item["data"]
+                                break
+                        if audio_data:
+                            break
+                if audio_data:
+                    import base64
+                    audio_bytes = base64.b64decode(audio_data)
+                    if audio_bytes.startswith(b"RIFF") and len(audio_bytes) > 44:
+                        return audio_bytes
+                    raise RuntimeError("Gemini TTS returned audio without a valid WAV header.")
+                last_error = "Gemini TTS response တွင် audio data မပါပါ။"
+            except (ValueError, TypeError, KeyError) as exc:
+                last_error = "Gemini TTS response ဖတ်မရပါ: " + str(exc)
+        else:
+            last_error = "HTTP " + str(response.status_code) + ": " + response.text[:500]
+            if response.status_code in (400, 401, 403, 404, 429):
+                break
+            if response.status_code not in (500, 502, 503, 504):
+                break
+    raise RuntimeError(last_error or "Gemini TTS မှ အသံမရပါ။")
+
+
+def _split_tts_chunks(text, max_chars=1200):
+    """Group complete sentences into moderate-size chunks without dropping text."""
+    sentences = [part.strip() for part in re.split(r"(?<=[.!?။])\s*|\n+", text) if part.strip()]
+    if not sentences:
+        sentences = [text.strip()]
+    chunks, current = [], ""
+    for sentence in sentences:
+        while len(sentence) > max_chars:
+            cut = max(sentence.rfind(mark, 1, max_chars) for mark in ("။", "၊", " ", ","))
+            if cut < max_chars // 2:
+                cut = max_chars
+            piece, sentence = sentence[:cut + 1].strip(), sentence[cut + 1:].strip()
+            if piece:
+                if current:
+                    chunks.append(current)
+                    current = ""
+                chunks.append(piece)
+        if current and len(current) + len(sentence) + 1 > max_chars:
+            chunks.append(current)
+            current = ""
+        current = (current + " " + sentence).strip()
+    if current:
+        chunks.append(current)
+    return chunks or [text.strip()]
+
+
+def synthesize_voice(script, language, audio_path, voice, voice_speed=100, boundaries_path=None, api_key=None):
+    """Generate narration exclusively with Gemini 3.8 Flash TTS."""
     import tempfile
     text = clean_myanmar_text(script).strip()
     if not text:
         fail("AI Voice ဖန်တီးရန် Script အလွတ်ဖြစ်နေသည်။")
     speed = max(70, min(130, int(voice_speed)))
-    rate = f"{speed - 100:+d}%"
-    parts = [p.strip() for p in split_sentences(text) if p.strip()] or [text]
-    temp_dir = Path(tempfile.mkdtemp(prefix="lynn_tts_"))
+    parts = _split_tts_chunks(text)
+    temp_dir = Path(tempfile.mkdtemp(prefix="gemini_tts_"))
     audio_parts = []
     last_error = None
-    async def save_part(part, output):
-        errors = []
-        candidates = []
-        for candidate in (voice, "my-MM-ThihaNeural", "my-MM-NilarNeural"):
-            if candidate and candidate not in candidates:
-                candidates.append(candidate)
-        for candidate in candidates:
-            for attempt in range(2):
-                try:
-                    if output.exists():
-                        output.unlink()
-                    # save() is more robust than manually consuming the streaming API.
-                    communicate = edge_tts.Communicate(part, candidate, rate=rate)
-                    await communicate.save(str(output))
-                    if output.exists() and output.stat().st_size > 0:
-                        return
-                    raise RuntimeError("No audio was received")
-                except Exception as exc:
-                    errors.append(f"{candidate}: {exc}")
-                    await asyncio.sleep(1 + attempt)
-        raise RuntimeError("; ".join(errors)[-400:])
     try:
         for index, part in enumerate(parts):
-            part_path = temp_dir / f"part_{index:05d}.mp3"
+            part_path = temp_dir / ("part_%05d.wav" % index)
             try:
-                asyncio.run(save_part(part, part_path))
+                audio_bytes = _gemini_tts_chunk(part, api_key, voice, speed)
+                part_path.write_bytes(audio_bytes)
+                if part_path.stat().st_size <= 44:
+                    raise RuntimeError("Gemini TTS audio အလွတ်ဖြစ်နေသည်။")
                 audio_parts.append(part_path)
             except Exception as exc:
                 last_error = exc
                 break
         if len(audio_parts) != len(parts):
-            fail("AI Voice ဖန်တီးမရပါ။ Myanmar TTS က အသံမပေးပါ။ ခဏနောက်ပြန်စမ်းပါ။ Error: " + str(last_error)[:250])
-        # Avoid concat demuxer manifest parsing entirely. Join each TTS segment
-        # through FFmpeg's audio concat filter, which does not depend on newline
-        # escaping or temporary concat.txt formatting.
-        concat_inputs = []
-        concat_labels = []
+            fail("Gemini AI Voice ဖန်တီးမရပါ။ အပိုင်း " + str(len(audio_parts) + 1) + "/" + str(len(parts)) + " တွင် ရပ်သွားသည်။ " + str(last_error)[:500])
+        concat_inputs, concat_labels = [], []
         for index, part_path in enumerate(audio_parts):
             concat_inputs.extend(["-i", str(part_path)])
-            concat_labels.append(f"[{index}:a]")
-        filter_graph = "".join(concat_labels) + f"concat=n={len(audio_parts)}:v=0:a=1[outa]"
+            concat_labels.append("[%d:a]" % index)
+        filter_graph = "".join(concat_labels) + "concat=n=%d:v=0:a=1[outa]" % len(audio_parts)
         run_command(["ffmpeg", "-y", *concat_inputs, "-filter_complex", filter_graph,
-                     "-map", "[outa]", "-c:a", "libmp3lame", "-q:a", "3", str(audio_path)],
-                    timeout=300)
+                     "-map", "[outa]", "-c:a", "libmp3lame", "-q:a", "3", str(audio_path)], timeout=600)
         if not audio_path.exists() or audio_path.stat().st_size == 0:
-            fail("AI Voice အသံဖိုင်ကို ပေါင်းစည်းမရပါ။")
+            fail("Gemini AI Voice အသံဖိုင်ကို ပေါင်းစည်းမရပါ။")
         if boundaries_path:
-            # Use the safe duration-weighted SRT fallback until reliable word timings are available.
             Path(boundaries_path).write_text("[]", encoding="utf-8")
     finally:
         shutil.rmtree(temp_dir, ignore_errors=True)
@@ -1175,7 +1240,7 @@ def process_job(job_id, url, language, workdir, gemini_api_key, groq_api_key, op
 
         update_job(job_id, progress=55)
         boundaries_file = workdir / "voice_boundaries.json"
-        synthesize_voice(script, language, voice, options.get("voice", "my-MM-NilarNeural"), options.get("voice_speed", 120), boundaries_file)
+        synthesize_voice(script, language, voice, options.get("voice", "Puck"), options.get("voice_speed", 120), boundaries_file, gemini_api_key)
 
         # Keep the AI narration at its generated speaking rate. Do not stretch it to
         # the full source-movie duration: recap scripts are intentionally shorter than
@@ -1223,30 +1288,20 @@ def create_voice_preview():
     from flask import request
     data = request.get_json(silent=True) or {}
     language = data.get("language", "my")
-    voice = data.get("voice", "my-MM-NilarNeural")
-    allowed = {"my-MM-NilarNeural", "my-MM-ThihaNeural"}
-    if voice not in allowed:
-        return jsonify({"error": "Voice ရွေးချယ်မှု မမှန်ပါ။"}), 400
+    voice = data.get("voice", "Puck")
+    api_key = (data.get("gemini_api_key") or "").strip()
+    if voice not in {"Puck", "Kore", "Charon", "Fenrir"}:
+        return jsonify({"error": "Gemini Voice ရွေးချယ်မှု မမှန်ပါ။"}), 400
     try:
-        speed = max(70, min(130, int(data.get("speed", 100))))
+        speed = max(70, min(130, int(data.get("speed", 110))))
     except (TypeError, ValueError):
-        speed = 100
-    rate = f"{speed - 100:+d}%"
-    sample = "မင်္ဂလာပါ။ ဒီအသံက သီဟနဲ့ နီလာ AI Voice ကို အစမ်းနားထောင်ဖို့ ဖြစ်ပါတယ်။" if language == "my" else "Hello! This is a short voice preview."
-    async def render_sample():
-        chunks = []
-        communicate = edge_tts.Communicate(sample, voice, rate=rate)
-        async for chunk in communicate.stream():
-            if chunk.get("type") == "audio":
-                chunks.append(chunk.get("data", b""))
-        return b"".join(chunks)
+        speed = 110
+    sample = "မင်္ဂလာပါ။ ဒီအသံက မြန်မာ Movie Recap အတွက် Gemini AI Voice အစမ်းနားထောင်ခြင်း ဖြစ်ပါတယ်။" if language == "my" else "Hello. This is a Gemini AI voice preview for a movie recap."
     try:
-        audio_bytes = __import__("asyncio").run(render_sample())
+        audio_bytes = _gemini_tts_chunk(sample, api_key, voice, speed)
     except Exception as exc:
-        return jsonify({"error": "အသံအစမ်းထုတ်မရပါ။ ခဏနောက် ပြန်စမ်းပါ။ " + str(exc)[:180]}), 502
-    if not audio_bytes:
-        return jsonify({"error": "AI Voice မှ အသံအချက်အလက် မရပါ။"}), 502
-    return send_file(io.BytesIO(audio_bytes), mimetype="audio/mpeg", download_name="voice-preview.mp3", as_attachment=False)
+        return jsonify({"error": "Gemini AI Voice အစမ်းထုတ်မရပါ။ " + str(exc)[:400]}), 502
+    return send_file(io.BytesIO(audio_bytes), mimetype="audio/wav", download_name="gemini-voice-preview.wav", as_attachment=False)
 
 @app.get("/health")
 def health():
@@ -1371,8 +1426,8 @@ def create_job():
     if len(recap_script) > 30000:
         return jsonify({"error": "Recap Script သည် စာလုံး 30,000 ထက် မကျော်ရပါ။"}), 400
     if request.is_json: options = data.get("options") or {}
-    allowed_voices = ("my-MM-NilarNeural", "my-MM-ThihaNeural")
-    if options.get("voice") not in allowed_voices: options["voice"] = "my-MM-NilarNeural"
+    allowed_voices = ("Puck", "Kore", "Charon", "Fenrir")
+    if options.get("voice") not in allowed_voices: options["voice"] = "Puck"
     try: options["voice_speed"] = max(70, min(130, int(options.get("voice_speed", 100))))
     except (TypeError, ValueError): options["voice_speed"] = 100
     options["mirror"] = str(options.get("mirror", "")).lower() in ("true", "1", "yes") if not isinstance(options.get("mirror"), bool) else options.get("mirror")
