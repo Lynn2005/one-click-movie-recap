@@ -536,24 +536,107 @@ def run_command(args, timeout=300):
         fail("Video processing မအောင်မြင်ပါ။ FFmpeg: " + details)
     return result.stdout.strip()
 
-def download_video(url, destination):
-    response = requests.get(url, stream=True, timeout=(15, 30), allow_redirects=True,
-                            headers={"User-Agent": "OneClickMovieRecap/1.0"})
-    response.raise_for_status()
-    final_url = validate_public_http_url(response.url)
-    content_type = response.headers.get("Content-Type", "").lower()
-    length = response.headers.get("Content-Length")
-    if length and int(length) > MAX_VIDEO_BYTES:
-        fail("ဗီဒီယို 80 MB ထက်ကြီးနေသည်။ ပိုသေးသော clip ကို အသုံးပြုပါ။")
-    total = 0
-    with open(destination, "wb") as output:
-        for chunk in response.iter_content(chunk_size=1024 * 256):
-            if not chunk:
-                continue
-            total += len(chunk)
-            if total > MAX_VIDEO_BYTES:
+def _is_supported_platform_url(url):
+    """Recognize common public video-page URLs that are not direct media files."""
+    try:
+        host = (urlparse(url).hostname or "").lower().rstrip(".")
+    except ValueError:
+        return False
+    supported_hosts = (
+        "youtube.com", "youtu.be", "youtube-nocookie.com",
+        "facebook.com", "fb.watch",
+        "tiktok.com",
+        "instagram.com",
+        "vimeo.com",
+        "dailymotion.com",
+    )
+    return any(host == domain or host.endswith("." + domain) for domain in supported_hosts)
+
+
+def _download_platform_video(url, destination):
+    """Download one public video page using yt-dlp, with strict output limits."""
+    try:
+        import yt_dlp
+    except ImportError:
+        fail("Video URL support ကို မတပ်ဆင်ရသေးပါ။ Server ကို requirements.txt အသစ်ဖြင့် redeploy လုပ်ပါ။")
+    temp_dir = Path(tempfile.mkdtemp(prefix="url-video-", dir=str(destination.parent)))
+    try:
+        output_template = str(temp_dir / "source.%(ext)s")
+        options = {
+            "outtmpl": output_template,
+            "format": "best[filesize<83886080]/best",
+            "max_filesize": MAX_VIDEO_BYTES,
+            "noplaylist": True,
+            "quiet": True,
+            "no_warnings": True,
+            "socket_timeout": 25,
+            "retries": 2,
+            "fragment_retries": 2,
+            "merge_output_format": "mp4",
+            "match_filter": yt_dlp.utils.match_filter_func("duration <= 600"),
+            "restrictfilenames": True,
+        }
+        try:
+            with yt_dlp.YoutubeDL(options) as downloader:
+                info = downloader.extract_info(url, download=True)
+        except Exception as exc:
+            message = str(exc)
+            if "duration" in message.lower() and ("match filter" in message.lower() or "filtered" in message.lower()):
+                fail("ဗီဒီယိုသည် ၁၀ မိနစ်ထက်ရှည်နေသည်။ ၁၀ မိနစ်အောက် clip ကိုသုံးပါ။")
+            if "filesize" in message.lower() or "file size" in message.lower():
                 fail("ဗီဒီယို 80 MB ထက်ကြီးနေသည်။ ပိုသေးသော clip ကို အသုံးပြုပါ။")
-            output.write(chunk)
+            fail("ဒီ Video URL ကို download မလုပ်နိုင်ပါ။ Public video link ဖြစ်ကြောင်း၊ login မလိုကြောင်းနှင့် platform က ခွင့်ပြုကြောင်း စစ်ပါ။ အသေးစိတ်: " + message[:240])
+        if isinstance(info, dict) and info.get("duration") and info["duration"] > MAX_VIDEO_SECONDS:
+            fail("ဗီဒီယိုသည် ၁၀ မိနစ်ထက်ရှည်နေသည်။ ၁၀ မိနစ်အောက် clip ကိုသုံးပါ။")
+        candidates = [p for p in temp_dir.iterdir() if p.is_file() and p.suffix.lower() in (".mp4", ".mov", ".webm", ".mkv")]
+        if not candidates:
+            fail("URL မှ video ဖိုင် မရပါ။ Public video link ကို ပြန်စစ်ပါ။")
+        downloaded = max(candidates, key=lambda p: p.stat().st_size)
+        size = downloaded.stat().st_size
+        if size <= 0:
+            fail("URL မှ video ဖိုင် အလွတ်ရရှိသည်။")
+        if size > MAX_VIDEO_BYTES:
+            fail("ဗီဒီယို 80 MB ထက်ကြီးနေသည်။ ပိုသေးသော clip ကို အသုံးပြုပါ။")
+        shutil.move(str(downloaded), str(destination))
+        return size, "video/" + destination.suffix.lstrip(".")
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+def download_video(url, destination):
+    validate_public_http_url(url)
+    if _is_supported_platform_url(url):
+        return _download_platform_video(url, destination)
+    try:
+        response = requests.get(url, stream=True, timeout=(15, 30), allow_redirects=True,
+                                headers={"User-Agent": "Mozilla/5.0 OneClickMovieRecap/1.0"})
+        response.raise_for_status()
+    except requests.RequestException as exc:
+        fail("Video URL ကို ဖွင့်မရပါ။ Direct MP4/MOV/WEBM ဖိုင်လင့်ခ်ဖြစ်ကြောင်းနှင့် public access ရှိကြောင်း စစ်ပါ။ အသေးစိတ်: " + str(exc)[:180])
+    validate_public_http_url(response.url)
+    content_type = response.headers.get("Content-Type", "").lower()
+    if "text/html" in content_type or "application/json" in content_type:
+        response.close()
+        fail("ဒီ URL က video ဖိုင်လင့်ခ်မဟုတ်ဘဲ webpage ဖြစ်နေသည်။ YouTube/Facebook/TikTok/Vimeo link ဆိုရင် platform video link အဖြစ်ထည့်ပါ၊ အခြားဆိုဒ်ဆိုရင် direct .mp4/.mov/.webm URL ကိုသုံးပါ။")
+    length = response.headers.get("Content-Length")
+    try:
+        if length and int(length) > MAX_VIDEO_BYTES:
+            response.close()
+            fail("ဗီဒီယို 80 MB ထက်ကြီးနေသည်။ ပိုသေးသော clip ကို အသုံးပြုပါ။")
+    except ValueError:
+        pass
+    total = 0
+    try:
+        with open(destination, "wb") as output:
+            for chunk in response.iter_content(chunk_size=1024 * 256):
+                if not chunk:
+                    continue
+                total += len(chunk)
+                if total > MAX_VIDEO_BYTES:
+                    fail("ဗီဒီယို 80 MB ထက်ကြီးနေသည်။ ပိုသေးသော clip ကို အသုံးပြုပါ။")
+                output.write(chunk)
+    finally:
+        response.close()
     if total < 1024:
         fail("URL မှ ဗီဒီယိုဖိုင် မရပါ။ Direct MP4/MOV/WEBM URL ဟုတ်မဟုတ် စစ်ပါ။")
     return total, content_type
