@@ -761,8 +761,8 @@ def make_recap(transcript, language, api_key):
         sections.append(section)
     return "\n\n".join(sections)
 
-def synthesize_voice(script, language, audio_path, voice, voice_speed=100):
-    # Edge TTS can occasionally reject WebSocket handshakes; retry with a fresh connection.
+def synthesize_voice(script, language, audio_path, voice, voice_speed=100, boundaries_path=None):
+    """Synthesize speech and capture Edge TTS word-boundary timestamps for subtitle alignment."""
     import asyncio
     last_error = None
     for attempt in range(3):
@@ -770,11 +770,28 @@ def synthesize_voice(script, language, audio_path, voice, voice_speed=100):
             if audio_path.exists():
                 audio_path.unlink()
             speed = max(70, min(130, int(voice_speed)))
-            rate = f"{speed - 100:+d}%"
-            communicate = edge_tts.Communicate(script, voice, rate=rate)
-            asyncio.run(communicate.save(str(audio_path)))
+            communicate = edge_tts.Communicate(script, voice, rate=f"{speed - 100:+d}%")
+            async def write_stream():
+                boundaries = []
+                with open(audio_path, "wb") as audio_file:
+                    async for chunk in communicate.stream():
+                        if chunk.get("type") == "audio":
+                            audio_file.write(chunk.get("data", b""))
+                        elif chunk.get("type") == "WordBoundary":
+                            data = chunk.get("data", {})
+                            try:
+                                boundaries.append({"offset": max(0.0, float(data.get("offset", 0))/10_000_000,
+                                    "duration": max(0.0, float(data.get("duration", 0))/10_000_000,
+                                    "text": str(data.get("text", "")), "text_offset": int(data.get("text_offset", -1)),
+                                    "word_length": int(data.get("word_length", 0))})
+                            except (TypeError, ValueError):
+                                continue
+                return boundaries
+            boundaries = asyncio.run(write_stream())
             if audio_path.exists() and audio_path.stat().st_size > 0:
-                return
+                if boundaries_path:
+                    Path(boundaries_path).write_text(json.dumps(boundaries, ensure_ascii=False), encoding="utf-8")
+                return boundaries
             last_error = RuntimeError("TTS က အသံဖိုင်အလွတ် ပြန်ပေးခဲ့သည်။")
         except Exception as exc:
             last_error = exc
@@ -1002,26 +1019,62 @@ def render_video(video_path, voice_path, output_path, options, music_path=None, 
         fail("Final MP4 ထဲမှာ Audio Stream မပါပါ။")
 
 
-def make_srt(script, voice_path, srt_path, options=None):
-    """Create readable SRT cues paced around three seconds and timed to the voice duration."""
+def make_srt(script, voice_path, srt_path, options=None, boundaries_path=None):
+    """Use real TTS word-boundary timestamps; fall back to weighted timings if unavailable."""
     options = options or {}
     duration_text = run_command(["ffprobe", "-v", "error", "-show_entries", "format=duration",
                                  "-of", "default=noprint_wrappers=1:nokey=1", str(voice_path)], timeout=30)
     duration = float(duration_text)
-    chunks = [chunk.strip() for chunk in split_subtitle_cues(clean_myanmar_text(script), options.get("subtitle_pace", "normal")) if chunk.strip()]
+    text = clean_myanmar_text(script).strip()
+    chunks = [chunk.strip() for chunk in split_subtitle_cues(text, options.get("subtitle_pace", "normal")) if chunk.strip()]
     if duration <= 0 or not chunks:
         fail("SRT ဖိုင်ဖန်တီးရန် Voice duration သို့မဟုတ် Script မမှန်ပါ။")
-    weights = [max(1, len(subtitle_units(chunk))) for chunk in chunks]
-    total = sum(weights)
-    current = 0.0
-    with open(srt_path, "w", encoding="utf-8") as handle:
-        for index, pair in enumerate(zip(chunks, weights), start=1):
-            chunk, weight = pair
+    boundaries = []
+    if boundaries_path and Path(boundaries_path).is_file():
+        try:
+            raw = json.loads(Path(boundaries_path).read_text(encoding="utf-8"))
+            boundaries = [b for b in raw if isinstance(b, dict) and b.get("text") and int(b.get("text_offset", -1)) >= 0]
+        except (OSError, ValueError, TypeError):
+            boundaries = []
+    cues = []
+    if boundaries:
+        raw_end = max((float(b.get("offset", 0)) + float(b.get("duration", 0)) for b in boundaries), default=0)
+        scale = duration / raw_end if raw_end > 0 else 1.0
+        pace = {"slow": 12, "normal": 20, "fast": 30}.get(str(options.get("subtitle_pace", "normal")).lower(), 20)
+        cue_text, cue_start, cue_end, cue_units = "", None, 0.0, 0
+        for b in boundaries:
+            try:
+                start = max(0.0, float(b["offset"]) * scale)
+                end = min(duration, max(start + 0.04, (float(b["offset"]) + float(b.get("duration", 0))) * scale))
+                offset = int(b["text_offset"])
+                length = max(1, int(b.get("word_length", len(str(b["text"])))))
+                word = text[offset:offset + length].strip() or str(b["text"]).strip()
+            except (KeyError, TypeError, ValueError):
+                continue
+            if not word:
+                continue
+            units = max(1, len(subtitle_units(word)))
+            if cue_text and (cue_units + units > pace or start - cue_end > 0.75 or end - cue_start > 4.0):
+                cues.append((cue_start, max(cue_start + 0.05, cue_end), cue_text.strip()))
+                cue_text, cue_start, cue_units = "", None, 0
+            if cue_start is None:
+                cue_start = start
+            cue_text += word
+            cue_units += units
+            cue_end = max(cue_end, end)
+        if cue_text.strip():
+            cues.append((cue_start or 0.0, min(duration, max((cue_start or 0.0) + 0.05, cue_end)), cue_text.strip()))
+    if not cues:
+        weights = [max(1, len(subtitle_units(chunk))) for chunk in chunks]
+        total, current = sum(weights), 0.0
+        for chunk, weight in zip(chunks, weights):
             start = current
             current += duration * weight / total
-            end = min(duration, current)
-            safe = chunk.replace("-->", "→").replace("\n", " ")
-            handle.write(str(index) + "\n" + seconds_to_srt(start) + " --> " + seconds_to_srt(end) + "\n" + safe + "\n\n")
+            cues.append((start, min(duration, current), chunk))
+    with open(srt_path, "w", encoding="utf-8") as handle:
+        for index, (start, end, cue) in enumerate(cues, start=1):
+            safe = cue.replace("-->", "→").replace("\\n", " ")
+            handle.write(str(index) + "\\n" + seconds_to_srt(start) + " --> " + seconds_to_srt(end) + "\\n" + safe + "\\n\\n")
 
 def save_latest_artifacts(workdir):
     """Replace the saved script/SRT/voice only when a new set is ready."""
@@ -1080,7 +1133,8 @@ def process_job(job_id, url, language, workdir, gemini_api_key, groq_api_key, op
         (workdir / "recap.txt").write_text(script, encoding="utf-8")
 
         update_job(job_id, progress=55)
-        synthesize_voice(script, language, voice, options.get("voice", "my-MM-NilarNeural"), options.get("voice_speed", 120))
+        boundaries_file = workdir / "voice_boundaries.json"
+        synthesize_voice(script, language, voice, options.get("voice", "my-MM-NilarNeural"), options.get("voice_speed", 120), boundaries_file)
 
         # Keep the original video timeline: fit the generated narration to the source duration.
         # This keeps the source footage at its original speed and makes the subtitle timeline
@@ -1093,7 +1147,7 @@ def process_job(job_id, url, language, workdir, gemini_api_key, groq_api_key, op
         if not music_path.exists():
             music_path = None
         srt_file = workdir / "recap.srt"
-        make_srt(script, voice, srt_file, options)
+        make_srt(script, voice, srt_file, options, boundaries_file)
 
         update_job(job_id, progress=80)
         render_video(video, voice, output, options, music_path, progress_callback=lambda percent: update_job(job_id, progress=percent))
