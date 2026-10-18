@@ -315,9 +315,9 @@ main{padding-left:max(0px,env(safe-area-inset-left));padding-right:max(0px,env(s
 <label for="videoFile">Option 2 — ဖုန်းထဲက Video Upload (MP4 / MOV / WEBM / M4V)</label>
 <input id="videoFile" name="video" type="file" multiple accept=".mp4,.mov,.webm,.m4v,video/mp4,video/quicktime,video/webm">
 <p class="muted small" id="multiUploadHint">Video အများအပြားကို တစ်ခါတည်းရွေးနိုင်သည်။ အများဆုံး ၅ ဖိုင်၊ တစ်ဖိုင်လျှင် 80 MB အထိ။ ဖိုင်တစ်ခုစီကို သီးခြား Job အဖြစ် တစ်ပြိုင်နက် Processing လုပ်မည်။</p>
-<div class="wizard-nav"><button type="button" class="next-step" data-next="1">Next → Voice</button></div></section>
+<div style="margin-top:12px"><button type="button" id="generateTranscriptFirst" class="primary">📄 Upload Video → Transcript ထုတ်ရန်</button><p id="transcriptFirstStatus" class="muted small" role="status">Video ကိုရွေးပြီး ဒီခလုတ်နှိပ်ပါ။ မူရင်း Transcript ထုတ်ပြီး Gemini ဘာသာပြန်ရန်အပိုင်းသို့ အရင်သွားမည်။</p></div><div class="wizard-nav"><button type="button" class="next-step" data-next="1">Next → Voice</button></div></section>
 <div class="panel" style="margin:18px 0;padding:16px;background:var(--panel2)">
-<h3 style="margin:0 0 8px">📄 Script — မူရင်းစာသား</h3>
+<h3 style="margin:0 0 8px">📄 Step 2 — Transcript ကို Gemini သို့ ပို့ရန်</h3>
 <p class="muted small">မူရင်း Transcript / Script ကို ဒီနေရာမှာ ထည့်ပါ။ ဒီအပိုင်းက Translate အပိုင်းနဲ့ သီးခြားဖြစ်ပါတယ်။</p>
 <label for="sourceScript">Original Script / Transcript (မူရင်းစာသား)</label>
 <textarea id="sourceScript" rows="6" placeholder="Website မှာရတဲ့ မူရင်း Transcript / Subtitle ကို ဒီမှာ ကူးထည့်ပါ…" style="width:100%;padding:12px;border-radius:11px;border:1px solid var(--field-border);background:var(--field);color:var(--text);font:inherit;resize:vertical"></textarea>
@@ -452,6 +452,27 @@ async function copyTextForTranslation(value,status){
  try{await navigator.clipboard.writeText(value);status.textContent='Copy လုပ်ပြီးပါပြီ။ Gemini ထဲ Paste လုပ်ပါ။';return true;}
  catch(e){status.textContent='အလိုအလျောက် Copy မရပါ။ အောက်တွင်ပြသောစာသားကို ရွေးပြီး Copy လုပ်ပါ။';return false;}
 }
+document.getElementById('generateTranscriptFirst').addEventListener('click',async()=>{
+ const status=document.getElementById('transcriptFirstStatus');
+ const files=Array.from(document.getElementById('videoFile').files||[]);
+ const url=document.getElementById('url').value.trim();
+ const groqKey=groqInput.value.trim();
+ if(!files.length&&!url){status.textContent='အရင်ဆုံး Video Upload လုပ်ပါ သို့မဟုတ် Video URL ထည့်ပါ။';return;}
+ if(files.length>1){status.textContent='Transcript အရင်ထုတ်ရန် Video တစ်ဖိုင်တည်းကိုသာ ရွေးပါ။';return;}
+ if(!groqKey){status.textContent='Settings ထဲမှာ Groq API Key ထည့်ပြီး Save လုပ်ပါ။';return;}
+ if(files.length&&files[0].size>80*1024*1024){status.textContent='Video ဖိုင်သည် 80 MB ထက် မကြီးရပါ။';return;}
+ const body=new FormData();body.append('url',url);body.append('groq_api_key',groqKey);if(files[0])body.append('video',files[0]);
+ const button=document.getElementById('generateTranscriptFirst');button.disabled=true;status.textContent='Video မှ အသံထုတ်ပြီး Transcript ပြုလုပ်နေသည်…';
+ try{
+  const res=await fetch('/api/transcript',{method:'POST',body});const data=await res.json();
+  if(!res.ok)throw new Error(data.error||'Transcript မထုတ်နိုင်ပါ။');
+  sourceScriptBox.value=data.transcript||'';
+  if(!sourceScriptBox.value.trim())throw new Error('Transcript အလွတ်ဖြစ်နေသည်။');
+  status.textContent='Transcript ထုတ်ပြီးပါပြီ။ မူရင်းစာသားကို Step 2 မှာ ဖြည့်ပြီး Gemini ဘာသာပြန်ရန် အသင့်ဖြစ်ပါပြီ။';
+  document.querySelector('.panel:has(#sourceScript)')?.scrollIntoView({behavior:'smooth',block:'start'});
+ }catch(err){status.textContent='Transcript အမှား: '+err.message;}
+ finally{button.disabled=false;}
+});
 document.getElementById('openGeminiTranslate').addEventListener('click',async()=>{
  const source=sourceScriptBox.value.trim();
  if(!source){translateHelperStatus.textContent='အရင်ဆုံး မူရင်း Transcript / Subtitle ကို ထည့်ပါ။';sourceScriptBox.focus();return;}
@@ -1510,6 +1531,41 @@ def delete_job(job_id):
         except Exception as exc:
             return jsonify({"error": "ဖိုင်ဖျက်ရာတွင် ပြဿနာရှိသည်: " + str(exc)[:200]}), 500
 
+
+@app.post("/api/transcript")
+def create_transcript():
+    from flask import request
+    url = (request.form.get("url") or "").strip()
+    groq_api_key = (request.form.get("groq_api_key") or "").strip()
+    uploaded_file = request.files.get("video")
+    if uploaded_file and not uploaded_file.filename:
+        uploaded_file = None
+    if not groq_api_key:
+        return jsonify({"error": "Groq API Key မထည့်ရသေးပါ။ Settings မှာထည့်ပြီး Save လုပ်ပါ။"}), 400
+    if len(groq_api_key) > 512:
+        return jsonify({"error": "Groq API Key ပုံစံမမှန်ပါ။"}), 400
+    if bool(url) == bool(uploaded_file):
+        return jsonify({"error": "Video Upload သို့မဟုတ် Video URL တစ်ခုကိုသာ ရွေးပါ။"}), 400
+    if uploaded_file and not (uploaded_file.filename or "").lower().endswith((".mp4", ".mov", ".webm", ".m4v")):
+        return jsonify({"error": "MP4, MOV, WEBM သို့မဟုတ် M4V ဖိုင်ကိုသာ Upload လုပ်ပါ။"}), 400
+    try:
+        with tempfile.TemporaryDirectory(prefix="movie-transcript-") as temp_name:
+            workdir = Path(temp_name)
+            video_path = workdir / "source.mp4"
+            audio_path = workdir / "source.mp3"
+            if uploaded_file:
+                uploaded_file.save(video_path)
+                if not video_path.is_file() or video_path.stat().st_size == 0:
+                    fail("Upload ဖိုင် အလွတ်ဖြစ်နေသည်။")
+                if video_path.stat().st_size > MAX_VIDEO_BYTES:
+                    fail("ဗီဒီယို 80 MB ထက်ကြီးနေသည်။ ပိုသေးသောဖိုင်ကို သုံးပါ။")
+            else:
+                download_video(url, video_path)
+            extract_audio(video_path, audio_path)
+            transcript = groq_transcribe(audio_path, groq_api_key)
+            return jsonify({"transcript": transcript, "characters": len(transcript)})
+    except Exception as exc:
+        return jsonify({"error": str(exc)[:700] or "Transcript ထုတ်ရာတွင် အမှားဖြစ်နေသည်။"}), 400
 
 @app.post("/api/jobs")
 def create_job():
