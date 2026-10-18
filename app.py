@@ -444,7 +444,7 @@ function extractGeminiTranslations(raw){
  const fenced=value.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
  if(fenced)candidates.push(fenced[1]);
  for(const candidate of candidates){
-  try{const parsed=JSON.parse(candidate);if(parsed&&Array.isArray(parsed.translations))return parsed.translations.map(v=>String(v??'').trim()).join('\\n');}catch(e){}
+  try{const parsed=JSON.parse(candidate);if(parsed&&Array.isArray(parsed.translations))return parsed.translations.map(v=>String(v??'').trim()).join('\n');}catch(e){}
  }
  return value;
 }
