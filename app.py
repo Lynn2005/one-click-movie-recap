@@ -319,15 +319,18 @@ main{padding-left:max(0px,env(safe-area-inset-left));padding-right:max(0px,env(s
 <div class="panel" style="margin:18px 0;padding:16px;background:var(--panel2)">
 <h3 style="margin:0 0 8px">📄 Script — မူရင်းစာသား</h3>
 <p class="muted small">မူရင်း Transcript / Script ကို ဒီနေရာမှာ ထည့်ပါ။ ဒီအပိုင်းက Translate အပိုင်းနဲ့ သီးခြားဖြစ်ပါတယ်။</p>
-<label for="sourceScript">Original Script / Transcript</label>
-<textarea id="sourceScript" rows="6" placeholder="မူရင်းဘာသာစကား Script ကို ဒီမှာ ကူးထည့်ပါ…" style="width:100%;padding:12px;border-radius:11px;border:1px solid var(--field-border);background:var(--field);color:var(--text);font:inherit;resize:vertical"></textarea>
+<label for="sourceScript">Original Script / Transcript (မူရင်းစာသား)</label>
+<textarea id="sourceScript" rows="6" placeholder="Website မှာရတဲ့ မူရင်း Transcript / Subtitle ကို ဒီမှာ ကူးထည့်ပါ…" style="width:100%;padding:12px;border-radius:11px;border:1px solid var(--field-border);background:var(--field);color:var(--text);font:inherit;resize:vertical"></textarea>
+<div class="option-grid" style="margin-top:10px"><button type="button" id="openGeminiTranslate">Gemini မှာ ဘာသာပြန်ရန်</button><button type="button" id="copyOriginalScript" style="background:#35415a;color:#fff">မူရင်းစာသား Copy</button></div>
+<p id="translateHelperStatus" class="muted small" role="status">မူရင်းစာသားကို ထည့်ပြီး “Gemini မှာ ဘာသာပြန်ရန်” ကိုနှိပ်ပါ။ Prompt နဲ့ စာသားကို Copy လုပ်ပြီး Gemini ဖွင့်ပေးမယ်။</p>
 </div>
 <div class="panel" style="margin:18px 0;padding:16px;background:var(--panel2)">
-<h3 style="margin:0 0 8px">🌐 Translate — မြန်မာဘာသာပြန်</h3>
-<p class="muted small">ကိုယ်တိုင် မြန်မာဘာသာပြန်ပြီး ဒီမှာ ထည့်ပါ။ AI Voice နဲ့ Subtitle ကို ဒီစာသားကို အခြေခံပြီး ဖန်တီးပါမယ်။</p>
-<label for="translatedScript">Translated Burmese Script</label>
-<textarea id="translatedScript" rows="8" placeholder="ကိုယ်တိုင် ဘာသာပြန်ထားသော မြန်မာ Script ကို ဒီမှာ ကူးထည့်ပါ…" style="width:100%;padding:12px;border-radius:11px;border:1px solid var(--field-border);background:var(--field);color:var(--text);font:inherit;resize:vertical"></textarea>
-<p class="muted small">Translate အကွက်မှာ စာသားထည့်ထားရင် အဲဒီစာသားကို AI Voice ထုတ်ရာမှာ အသုံးပြုမယ်။</p>
+<h3 style="margin:0 0 8px">Gemini ဘာသာပြန်ရလဒ်</h3>
+<p class="muted small">Gemini ရဲ့ JSON အဖြေတစ်ခုလုံးကို Paste လုပ်ပြီး အသုံးပြုရန် နှိပ်ပါ။</p>
+<label for="translatedScript">ဘာသာပြန်စာသား / Gemini JSON</label>
+<textarea id="translatedScript" rows="8" placeholder='{"translations":["မြန်မာစာသား ၁","မြန်မာစာသား ၂"]} ကို ဒီမှာ Paste လုပ်ပါ…' style="width:100%;padding:12px;border-radius:11px;border:1px solid var(--field-border);background:var(--field);color:var(--text);font:inherit;resize:vertical"></textarea>
+<div class="option-grid" style="margin-top:10px"><button type="button" id="applyGeminiTranslation">ဘာသာပြန်ရလဒ် အသုံးပြုရန်</button><button type="button" id="copyBurmeseText" style="background:#35415a;color:#fff">မြန်မာစာ Copy</button></div>
+<p id="translationResultStatus" class="muted small" role="status">Gemini အဖြေကို Paste လုပ်ပြီး အသုံးပြုရန် နှိပ်ပါ။</p>
 </div>
 <section class="wizard-step" data-step="1"><div class="step-head"><span class="step-number">2</span><div><div class="step-title">မြန်မာ AI Voice</div><div class="step-desc">မူရင်းအသံမှ စာသားထုတ်၊ မြန်မာ Recap ပြုလုပ်ပြီး AI Voice ထုတ်မည်</div></div></div>
 <div class="option-grid"><div><label for="language">Recap ဘာသာ</label><select id="language" name="language"><option value="my">မြန်မာ</option><option value="en">English</option></select></div><div><label for="voice">Voice</label><select id="voice" name="voice"><option value="Puck" selected>Gemini Puck (ယောက်ျားသံ စမ်းသပ်ရန်)</option><option value="Charon">Gemini Charon (နက်ရှိုင်းသောအသံ)</option><option value="Kore">Gemini Kore</option><option value="Fenrir">Gemini Fenrir</option></select></div><div><label for="voiceSpeed">AI Voice ပြောနှုန်း</label><select id="voiceSpeed" name="voice_speed"><option value="100">ပုံမှန် (100%)</option><option value="110">နည်းနည်းမြန် (110%)</option><option value="120" selected>မြန်မြန် (120%)</option><option value="130">အမြန်ဆုံး (130%)</option></select><p class="muted small">Default ကို ၂၀% မြန်အောင်ထားပြီး Voice ကို Video အရှည်အတိုင်း အတင်းမနှေးစေပါ။</p></div><div><label for="subtitlePace">SRT စာတန်းပြောနှုန်း (၃ စက္ကန့်ခန့်)</label><select id="subtitlePace" name="subtitle_pace"><option value="slow">ဖြည်းဖြည်း၊ ရှင်းရှင်း — ၁၀–၁၅ လုံး</option><option value="normal" selected>ပုံမှန် Recap — ၁၅–၂၅ လုံး</option><option value="fast">မြန်မြန်ပြော — ၂၅–၃၅ လုံး</option></select></div></div>
@@ -429,6 +432,64 @@ function loadSavedKeys(){try{geminiInput.value=localStorage.getItem('oneclick_ge
 document.getElementById('saveKeys').addEventListener('click',()=>{const g=geminiInput.value.trim(),q=groqInput.value.trim();if(!g||!q){keyStatus.textContent='Gemini နဲ့ Groq Key နှစ်ခုလုံး ထည့်ပါ။';return;}try{localStorage.setItem('oneclick_gemini_key',g);localStorage.setItem('oneclick_groq_key',q);keyStatus.textContent='Key နှစ်ခုလုံးကို ဒီ Browser ထဲမှာ Save လုပ်ပြီးပါပြီ။';}catch(e){keyStatus.textContent='Save မလုပ်နိုင်ပါ။ Browser storage setting ကို စစ်ပါ။';}});
 document.getElementById('clearKeys').addEventListener('click',()=>{try{localStorage.removeItem('oneclick_gemini_key');localStorage.removeItem('oneclick_groq_key');}catch(e){}geminiInput.value='';groqInput.value='';keyStatus.textContent='Browser ထဲက Saved Keys ကို ဖျက်ပြီးပါပြီ။';});
 loadSavedKeys();
+// Gemini translation hand-off: copy source + strict JSON prompt, then open Gemini.
+const sourceScriptBox=document.getElementById('sourceScript');
+const translatedScriptBox=document.getElementById('translatedScript');
+const translateHelperStatus=document.getElementById('translateHelperStatus');
+const translationResultStatus=document.getElementById('translationResultStatus');
+function extractGeminiTranslations(raw){
+ const value=String(raw||'').trim();
+ if(!value)return '';
+ const candidates=[value];
+ const fenced=value.match(/```(?:json)?\\s*([\\s\\S]*?)\\s*```/i);
+ if(fenced)candidates.push(fenced[1]);
+ for(const candidate of candidates){
+  try{const parsed=JSON.parse(candidate);if(parsed&&Array.isArray(parsed.translations))return parsed.translations.map(v=>String(v??'').trim()).join('\\n');}catch(e){}
+ }
+ return value;
+}
+async function copyTextForTranslation(value,status){
+ try{await navigator.clipboard.writeText(value);status.textContent='Copy လုပ်ပြီးပါပြီ။ Gemini ထဲ Paste လုပ်ပါ။';return true;}
+ catch(e){status.textContent='အလိုအလျောက် Copy မရပါ။ အောက်တွင်ပြသောစာသားကို ရွေးပြီး Copy လုပ်ပါ။';return false;}
+}
+document.getElementById('openGeminiTranslate').addEventListener('click',async()=>{
+ const source=sourceScriptBox.value.trim();
+ if(!source){translateHelperStatus.textContent='အရင်ဆုံး မူရင်း Transcript / Subtitle ကို ထည့်ပါ။';sourceScriptBox.focus();return;}
+ const prompt='You are a professional video dubbing translator. Translate each subtitle line into natural spoken Burmese (Myanmar script ONLY, NO English, NO phonetic guides). Keep the same order and return STRICTLY a valid JSON object with one key "translations" containing an array of strings, one translation per input line. Do not add explanations.\\n\\nInputs:\\n'+source;
+ const win=window.open('https://gemini.google.com/app','_blank');
+ const copied=await copyTextForTranslation(prompt,translateHelperStatus);
+ if(!copied){
+  let fallback=document.getElementById('geminiPromptFallback');
+  if(!fallback){fallback=document.createElement('textarea');fallback.id='geminiPromptFallback';fallback.rows=5;fallback.style.cssText='width:100%;margin-top:8px;padding:10px;border-radius:10px;background:var(--field);color:var(--text)';document.getElementById('openGeminiTranslate').insertAdjacentElement('afterend',fallback);}
+  fallback.value=prompt;fallback.focus();fallback.select();
+ }
+ if(!win)translateHelperStatus.textContent+=' Pop-up ပိတ်ထားနိုင်ပါတယ်။ Gemini ကို ကိုယ်တိုင်ဖွင့်ပါ။';
+ else if(copied)translateHelperStatus.textContent='Prompt နဲ့ မူရင်းစာသား Copy လုပ်ပြီး Gemini ဖွင့်ထားပါတယ်။ Paste လုပ်ပြီး Send နှိပ်ပါ။';
+});
+document.getElementById('copyOriginalScript').addEventListener('click',async()=>{
+ const source=sourceScriptBox.value.trim();
+ if(!source){translateHelperStatus.textContent='Copy လုပ်ရန် မူရင်းစာသား မရှိသေးပါ။';return;}
+ await copyTextForTranslation(source,translateHelperStatus);
+});
+document.getElementById('applyGeminiTranslation').addEventListener('click',()=>{
+ const result=extractGeminiTranslations(translatedScriptBox.value);
+ if(!result.trim()){translationResultStatus.textContent='Gemini အဖြေကို အရင် Paste လုပ်ပါ။';return;}
+ translatedScriptBox.value=result;
+ translationResultStatus.textContent='ဘာသာပြန်စာသား အသုံးပြုရန် အဆင်သင့်ဖြစ်ပါပြီ။ Generate လုပ်လျှင် AI Voice / Subtitle အတွက် ဒီစာသားကို သုံးပါမယ်။';
+});
+document.getElementById('copyBurmeseText').addEventListener('click',async()=>{
+ const result=extractGeminiTranslations(translatedScriptBox.value);
+ if(!result.trim()){translationResultStatus.textContent='Copy လုပ်ရန် ဘာသာပြန်စာသား မရှိသေးပါ။';return;}
+ const ok=await copyTextForTranslation(result,translationResultStatus);
+ if(!ok){translatedScriptBox.value=result;translatedScriptBox.focus();translatedScriptBox.select();}
+});
+document.getElementById('clearTranslateFields').addEventListener('click',()=>{
+ sourceScriptBox.value='';translatedScriptBox.value='';
+ const fallback=document.getElementById('geminiPromptFallback');if(fallback)fallback.remove();
+ translateHelperStatus.textContent='မူရင်းစာသားကို ထည့်ပြီး Gemini မှာ ဘာသာပြန်နိုင်ပါပြီ။';
+ translationResultStatus.textContent='Gemini အဖြေကို Paste လုပ်ပြီး အသုံးပြုရန် နှိပ်ပါ။';
+});
+
 async function submitMultipleVideos(files,geminiKey,groqKey){
  const result=document.getElementById('result'),statusBox=document.getElementById('status'),links=document.getElementById('links'),btn=document.getElementById('submit');
  const recapScript=document.getElementById('translatedScript')?.value.trim()||'';
@@ -483,7 +544,7 @@ async function pollMultipleJobs(jobs){
  result.classList.remove('hidden');await refresh();
 }
 form.addEventListener('submit',async(e)=>{e.preventDefault();const geminiKey=geminiInput.value.trim(),groqKey=groqInput.value.trim(),videoFiles=Array.from(document.getElementById('videoFile').files||[]),videoFile=videoFiles[0],videoUrl=document.getElementById('url').value.trim();const recapScript=document.getElementById('recapScript')?.value.trim()||'';if(!recapScript&&(!geminiKey||!groqKey)){result.classList.remove('hidden');statusBox.textContent='Auto Recap အတွက် API Key Settings မှာ Gemini နဲ့ Groq Key နှစ်ခုလုံးထည့်ပြီး Save Keys ကိုနှိပ်ပါ။ ကိုယ်ပိုင် Script သုံးလျှင် API Key မလိုပါ။';return;}if((!videoUrl&&!videoFiles.length)||(videoUrl&&videoFiles.length)){result.classList.remove('hidden');statusBox.textContent='Video URL သို့မဟုတ် Upload Video ကိုသာ ရွေးပါ။';return;}if(videoFiles.length>5){result.classList.remove('hidden');statusBox.textContent='တစ်ကြိမ်လျှင် အများဆုံး Video ၅ ဖိုင်သာ ရွေးနိုင်သည်။';return;}if(videoFiles.some(file=>file.size>80*1024*1024)){result.classList.remove('hidden');statusBox.textContent='Video တစ်ဖိုင်ချင်းစီသည် 80 MB ထက် မကြီးရပါ။';return;}if(videoFiles.length>1){await submitMultipleVideos(videoFiles,geminiKey,groqKey);return;}btn.disabled=true;result.classList.remove('hidden');links.innerHTML='';setProgress(0);statusBox.textContent='';
-try{const body=new FormData();const options={voice:document.getElementById('voice').value,voice_speed:document.getElementById('voiceSpeed').value,subtitle_pace:document.getElementById('subtitlePace').value,auto_effect:document.getElementById('autoEffect').checked,auto_blur_subtitles:document.getElementById('autoBlurSubtitles').checked,mirror:document.getElementById('mirror').checked,overlay_text:''};body.append('url',videoFile?'':videoUrl);body.append('language',document.getElementById('language').value);body.append('gemini_api_key',geminiKey);body.append('groq_api_key',groqKey);Object.entries(options).forEach(([k,v])=>body.append(k,String(v)));if(videoFile)body.append('video',videoFile);body.append('recap_script',document.getElementById('translatedScript')?.value.trim()||'');const res=await fetch('/api/jobs',{method:'POST',body});const data=await res.json();if(!res.ok)throw new Error(data.error||'စတင်၍မရပါ');poll(data.id);}catch(err){statusBox.textContent='အမှား: '+err.message;btn.disabled=false;}});
+try{const body=new FormData();const options={voice:document.getElementById('voice').value,voice_speed:document.getElementById('voiceSpeed').value,subtitle_pace:document.getElementById('subtitlePace').value,auto_effect:document.getElementById('autoEffect').checked,auto_blur_subtitles:document.getElementById('autoBlurSubtitles').checked,mirror:document.getElementById('mirror').checked,overlay_text:''};body.append('url',videoFile?'':videoUrl);body.append('language',document.getElementById('language').value);body.append('gemini_api_key',geminiKey);body.append('groq_api_key',groqKey);Object.entries(options).forEach(([k,v])=>body.append(k,String(v)));if(videoFile)body.append('video',videoFile);body.append('recap_script',extractGeminiTranslations(document.getElementById('translatedScript')?.value||'').trim());const res=await fetch('/api/jobs',{method:'POST',body});const data=await res.json();if(!res.ok)throw new Error(data.error||'စတင်၍မရပါ');poll(data.id);}catch(err){statusBox.textContent='အမှား: '+err.message;btn.disabled=false;}});
 async function poll(id){try{const res=await fetch('/api/jobs/'+id);const data=await res.json();if(!res.ok){if(res.status===404){statusBox.textContent='အရင် Job ကို server မှာ မတွေ့တော့ပါ။ Render restart/redeploy ဖြစ်ခဲ့နိုင်ပါတယ်။ Video ရွေးထားဆဲဆိုရင် Generate Final Video ကို ထပ်နှိပ်ပြီး Job အသစ်စတင်ပါ။';links.innerHTML='';btn.disabled=false;showStep(2);return;}throw new Error(data.error||'အခြေအနေမရပါ');}setProgress(data.progress??(data.status==='done'?100:0));statusBox.textContent=data.message|| (data.status==='queued'?'အလုပ်တန်းစီနေသည်…':data.status==='running'?'လုပ်ဆောင်နေသည်…':'');
 if(data.status==='done'){setProgress(100);loadSavedVideos();links.innerHTML='<button type="button" id="finalBackBtn" class="back" style="width:100%;margin-bottom:12px">← နောက်သို့ — Voice ပြန်သွားရန်</button><h3>🎬 Final Video Preview</h3><video id="finalVideoPreview" controls playsinline preload="metadata" style="display:block;width:100%;max-height:72vh;aspect-ratio:16/9;object-fit:contain;background:#05070d;border:1px solid #31435e;border-radius:14px;margin:10px 0" src="/api/jobs/'+id+'/preview"></video><a class="download" href="/api/jobs/'+id+'/download">⬇️ Final MP4 ဒေါင်းလုဒ်လုပ်ရန်</a>';document.getElementById('finalBackBtn').addEventListener('click',()=>{document.getElementById('jobform').parentElement.style.display='';showStep(1);document.querySelector('.wizard-step[data-step="1"]')?.scrollIntoView({behavior:'smooth',block:'start'});});document.getElementById('jobform').parentElement.style.display='none';document.querySelectorAll('main > p.muted').forEach(el=>el.style.display='none');let resultHeading=document.querySelector('#result h2');if(!resultHeading&&result){resultHeading=document.createElement('h2');result.prepend(resultHeading);}if(resultHeading)resultHeading.textContent='🎬 Final Video Preview';btn.disabled=false;showStep(2);statusBox.scrollIntoView({behavior:'smooth',block:'center'});return;}
 if(data.status==='error'){statusBox.textContent='Error: '+data.message;btn.disabled=false;return;}setTimeout(()=>poll(id),3000);
