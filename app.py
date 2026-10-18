@@ -689,7 +689,7 @@ def make_recap(transcript, language, api_key):
     # Generate sequential sections instead of asking for the whole transcript in one
     # response. This avoids silently losing the beginning/end when the model hits its
     # output-token limit. Keep sentence boundaries when splitting.
-    sentences = [part.strip() for part in re.split(r"(?<=[.!?။])\s*|\n+", text) if part.strip()]
+    sentences = [part.strip() for part in re.split(r"(?<=[.!?။])\s*|\n+", transcript) if part.strip()]
     # Also split unusually long unpunctuated Whisper output, so no API request is oversized.
     pieces = []
     for sentence in sentences or [transcript.strip()]:
@@ -947,7 +947,7 @@ def clean_myanmar_text(text):
 def split_sentences(text):
     # Burmese sentences often have no whitespace after ။ or ၊.
     sentences = [part.strip() for part in re.split(r"(?<=[.!?။])\s*|\n+", text) if part.strip()]
-    pieces = [p.strip() for p in pieces if p.strip()]
+    sentences = [p.strip() for p in sentences if p.strip()]
     lines = []
     for piece in pieces:
         while len(piece) > 54:
