@@ -1133,7 +1133,7 @@ def render_video(video_path, voice_path, output_path, options, music_path=None, 
                 try:
                     # FFmpeg's out_time_ms value is in microseconds despite its name.
                     elapsed = max(0.0, float(value) / 1_000_000)
-                    fraction = min(1.0, elapsed / voice_duration)
+                    fraction = min(1.0, elapsed / source_video_duration)
                     if progress_callback and fraction > last_fraction:
                         last_fraction = fraction
                         progress_callback(80 + int(fraction * 19))
@@ -1151,6 +1151,13 @@ def render_video(video_path, voice_path, output_path, options, music_path=None, 
         progress_callback(99)
     if not output_path.exists() or output_path.stat().st_size == 0:
         fail("MP4 ဖိုင် မထွက်လာပါ။")
+    video_check = run_command(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=codec_name,width,height", "-of", "json", str(output_path)], timeout=30).strip()
+    try:
+        video_streams = json.loads(video_check).get("streams", [])
+    except (TypeError, ValueError, json.JSONDecodeError):
+        video_streams = []
+    if not video_streams or int(video_streams[0].get("width", 0)) <= 0 or int(video_streams[0].get("height", 0)) <= 0:
+        fail("Final MP4 ထဲမှာ ဖွင့်လို့ရသော Video Stream မရှိပါ။")
     audio_check = run_command(["ffprobe","-v","error","-select_streams","a:0","-show_entries","stream=codec_name","-of","default=noprint_wrappers=1:nokey=1",str(output_path)], timeout=30).strip()
     if not audio_check:
         fail("Final MP4 ထဲမှာ Audio Stream မပါပါ။")
