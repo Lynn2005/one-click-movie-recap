@@ -1579,6 +1579,13 @@ def download_job(job_id):
     with JOBS_LOCK:
         job = dict(JOBS.get(job_id) or {})
     if not job:
+        try:
+            with _db_connect() as connection:
+                row = connection.execute("SELECT payload FROM jobs WHERE id=?", (job_id,)).fetchone()
+            job = json.loads(row[0]) if row else {}
+        except (OSError, sqlite3.Error, TypeError, ValueError, json.JSONDecodeError):
+            job = {}
+    if not job:
         job = _r2_get_job(job_id) or {}
     if job and job.get("status") != "done":
         abort(404)
@@ -1595,6 +1602,13 @@ def download_job(job_id):
 def preview_job(job_id):
     with JOBS_LOCK:
         job = dict(JOBS.get(job_id) or {})
+    if not job:
+        try:
+            with _db_connect() as connection:
+                row = connection.execute("SELECT payload FROM jobs WHERE id=?", (job_id,)).fetchone()
+            job = json.loads(row[0]) if row else {}
+        except (OSError, sqlite3.Error, TypeError, ValueError, json.JSONDecodeError):
+            job = {}
     if not job:
         job = _r2_get_job(job_id) or {}
     if job and job.get("status") != "done":
