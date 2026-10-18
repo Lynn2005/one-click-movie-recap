@@ -321,7 +321,7 @@ main{padding-left:max(0px,env(safe-area-inset-left));padding-right:max(0px,env(s
 <p class="muted small">မူရင်း Transcript / Script ကို ဒီနေရာမှာ ထည့်ပါ။ ဒီအပိုင်းက Translate အပိုင်းနဲ့ သီးခြားဖြစ်ပါတယ်။</p>
 <label for="sourceScript">Original Script / Transcript (မူရင်းစာသား)</label>
 <textarea id="sourceScript" rows="6" placeholder="Website မှာရတဲ့ မူရင်း Transcript / Subtitle ကို ဒီမှာ ကူးထည့်ပါ…" style="width:100%;padding:12px;border-radius:11px;border:1px solid var(--field-border);background:var(--field);color:var(--text);font:inherit;resize:vertical"></textarea>
-<div class="option-grid" style="margin-top:10px"><button type="button" id="openGeminiTranslate">Gemini မှာ ဘာသာပြန်ရန်</button><button type="button" id="copyOriginalScript" style="background:#35415a;color:#fff">မူရင်းစာသား Copy</button></div>
+<div class="option-grid" style="margin-top:10px"><button type="button" id="openGeminiTranslate">Gemini မှာ ဘာသာပြန်ရန်</button><button type="button" id="copyOriginalScript" style="background:#35415a;color:#fff">မူရင်းစာသား Copy</button><button type="button" id="clearTranslateFields" style="background:#35415a;color:#fff">ရှင်းလင်းရန်</button></div>
 <p id="translateHelperStatus" class="muted small" role="status">မူရင်းစာသားကို ထည့်ပြီး “Gemini မှာ ဘာသာပြန်ရန်” ကိုနှိပ်ပါ။ Prompt နဲ့ စာသားကို Copy လုပ်ပြီး Gemini ဖွင့်ပေးမယ်။</p>
 </div>
 <div class="panel" style="margin:18px 0;padding:16px;background:var(--panel2)">
