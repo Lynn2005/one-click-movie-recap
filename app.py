@@ -871,7 +871,7 @@ def _gemini_tts_chunk(part, api_key, voice, speed):
         break
     raise RuntimeError(last_error or "Gemini TTS မှ အသံမရပါ။")
 
-def _split_tts_chunks(text, max_chars=220):
+def _split_tts_chunks(text, max_chars=400):
     """Group complete sentences into moderate-size chunks without dropping text."""
     sentences = [part.strip() for part in re.split(r"(?<=[.!?။])\s*|\n+", text) if part.strip()]
     if not sentences:
@@ -896,7 +896,7 @@ def _split_tts_chunks(text, max_chars=220):
         chunks.append(current)
     return chunks or [text.strip()]
 
-def synthesize_voice(script, language, audio_path, voice, voice_speed=100, boundaries_path=None, api_key=None):
+def synthesize_voice(script, language, audio_path, voice, voice_speed=100, boundaries_path=None, api_key=None, progress_callback=None):
     """Generate Gemini narration; cache completed chunks so retries don't waste quota."""
     import hashlib
     text = clean_myanmar_text(script).strip()
@@ -923,6 +923,8 @@ def synthesize_voice(script, language, audio_path, voice, voice_speed=100, bound
                 last_error = exc
                 fail("Gemini AI Voice ဖန်တီးမရပါ။ အပိုင်း " + str(index + 1) + "/" + str(len(parts)) + " တွင် ရပ်သွားသည်။ " + str(last_error)[:500])
         audio_parts.append(part_path)
+        if progress_callback:
+            progress_callback(55 + int(((index + 1) / max(1, len(parts))) * 15))
     concat_inputs, concat_labels = [], []
     for index, part_path in enumerate(audio_parts):
         concat_inputs.extend(["-i", str(part_path)])
@@ -1288,7 +1290,7 @@ def process_job(job_id, url, language, workdir, gemini_api_key, groq_api_key, op
 
         update_job(job_id, progress=55)
         boundaries_file = workdir / "voice_boundaries.json"
-        synthesize_voice(script, language, voice, options.get("voice", "Puck"), options.get("voice_speed", 120), boundaries_file, gemini_api_key)
+        synthesize_voice(script, language, voice, options.get("voice", "Puck"), options.get("voice_speed", 120), boundaries_file, gemini_api_key, progress_callback=lambda percent: update_job(job_id, progress=percent))
 
         # Keep the AI narration at its generated speaking rate. Do not stretch it to
         # the full source-movie duration: recap scripts are intentionally shorter than
