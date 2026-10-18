@@ -949,7 +949,7 @@ def split_sentences(text):
     sentences = [part.strip() for part in re.split(r"(?<=[.!?။])\s*|\n+", text) if part.strip()]
     sentences = [p.strip() for p in sentences if p.strip()]
     lines = []
-    for piece in pieces:
+    for piece in sentences:
         while len(piece) > 54:
             cut = piece.rfind(" ", 0, 48)
             if cut < 15:
