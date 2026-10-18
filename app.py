@@ -774,8 +774,25 @@ def make_recap(transcript, language, api_key):
         sections.append(section)
     return "\n\n".join(sections)
 
+# Gemini Free Tier permits only a small number of TTS requests per minute.
+# Keep a process-wide rolling-window limiter so parallel jobs don't all hit 429.
+_GEMINI_TTS_REQUEST_TIMES = []
+_GEMINI_TTS_RATE_LOCK = threading.Lock()
+
+def _wait_for_gemini_tts_slot():
+    while True:
+        with _GEMINI_TTS_RATE_LOCK:
+            now = time.monotonic()
+            while _GEMINI_TTS_REQUEST_TIMES and now - _GEMINI_TTS_REQUEST_TIMES[0] >= 60:
+                _GEMINI_TTS_REQUEST_TIMES.pop(0)
+            if len(_GEMINI_TTS_REQUEST_TIMES) < 3:
+                _GEMINI_TTS_REQUEST_TIMES.append(now)
+                return
+            wait_seconds = max(0.5, 60 - (now - _GEMINI_TTS_REQUEST_TIMES[0]) + 0.5)
+        time.sleep(wait_seconds)
+
 def _gemini_tts_chunk(part, api_key, voice, speed):
-    """Call the official Gemini TTS Interactions REST API and return complete WAV bytes."""
+    """Call Gemini TTS with rate-limit-aware retries and return complete WAV bytes."""
     if not api_key:
         raise RuntimeError("Gemini API Key မရှိပါ။ Website API Key Settings မှာ Gemini Key ထည့်ပါ။")
     pace = {
@@ -798,9 +815,9 @@ def _gemini_tts_chunk(part, api_key, voice, speed):
         "generation_config": {"speech_config": [{"voice": voice or "Puck"}]},
     }
     last_error = ""
-    for attempt, delay in enumerate((0, 2, 5)):
-        if delay:
-            time.sleep(delay)
+    # Retry transient errors and 429s; each retry goes through the shared limiter.
+    for attempt in range(5):
+        _wait_for_gemini_tts_slot()
         try:
             response = requests.post(
                 "https://generativelanguage.googleapis.com/v1beta/interactions",
@@ -809,7 +826,10 @@ def _gemini_tts_chunk(part, api_key, voice, speed):
             )
         except requests.RequestException as exc:
             last_error = str(exc)
-            continue
+            if attempt < 4:
+                time.sleep(min(2 ** attempt, 12))
+                continue
+            break
         if response.status_code == 200:
             try:
                 data = response.json()
@@ -831,18 +851,29 @@ def _gemini_tts_chunk(part, api_key, voice, speed):
                 last_error = "Gemini TTS response တွင် audio data မပါပါ။"
             except (ValueError, TypeError, KeyError) as exc:
                 last_error = "Gemini TTS response ဖတ်မရပါ: " + str(exc)
-        else:
-            last_error = "HTTP " + str(response.status_code) + ": " + response.text[:500]
-            if response.status_code in (400, 401, 403, 404, 429):
                 break
-            if response.status_code not in (500, 502, 503, 504):
-                break
+            break
+        last_error = "HTTP " + str(response.status_code) + ": " + response.text[:500]
+        if response.status_code == 429 and attempt < 4:
+            # Retry-After is honored by the rolling limiter; use a short backoff
+            # as well for providers that don't return a standard Retry-After header.
+            retry_after = response.headers.get("Retry-After", "")
+            try:
+                wait_seconds = max(1, min(65, int(float(retry_after))))
+            except (TypeError, ValueError):
+                match = re.search(r"retry in\\s+(\\d+)\\s*s", response.text, re.IGNORECASE)
+                wait_seconds = min(65, int(match.group(1)) + 1) if match else 3
+            time.sleep(wait_seconds)
+            continue
+        if response.status_code in (500, 502, 503, 504) and attempt < 4:
+            time.sleep(min(2 ** attempt, 12))
+            continue
+        break
     raise RuntimeError(last_error or "Gemini TTS မှ အသံမရပါ။")
-
 
 def _split_tts_chunks(text, max_chars=220):
     """Group complete sentences into moderate-size chunks without dropping text."""
-    sentences = [part.strip() for part in re.split(r"(?<=[.!?။])\s*|\n+", text) if part.strip()]
+    sentences = [part.strip() for part in re.split(r"(?<=[.!?။])\\s*|\\n+", text) if part.strip()]
     if not sentences:
         sentences = [text.strip()]
     chunks, current = [], ""
@@ -865,45 +896,44 @@ def _split_tts_chunks(text, max_chars=220):
         chunks.append(current)
     return chunks or [text.strip()]
 
-
 def synthesize_voice(script, language, audio_path, voice, voice_speed=100, boundaries_path=None, api_key=None):
-    """Generate narration exclusively with Gemini 3.8 Flash TTS."""
-    import tempfile
+    """Generate Gemini narration; cache completed chunks so retries don't waste quota."""
+    import hashlib
     text = clean_myanmar_text(script).strip()
     if not text:
         fail("AI Voice ဖန်တီးရန် Script အလွတ်ဖြစ်နေသည်။")
     speed = max(70, min(130, int(voice_speed)))
     parts = _split_tts_chunks(text)
-    temp_dir = Path(tempfile.mkdtemp(prefix="gemini_tts_"))
+    # Keep successful chunks in the job folder. If a later chunk hits a quota limit,
+    # the next run can reuse finished audio instead of requesting it again.
+    cache_dir = Path(audio_path).parent / ".gemini_tts_chunks"
+    cache_dir.mkdir(parents=True, exist_ok=True)
     audio_parts = []
     last_error = None
-    try:
-        for index, part in enumerate(parts):
-            part_path = temp_dir / ("part_%05d.wav" % index)
+    for index, part in enumerate(parts):
+        signature = hashlib.sha256((part + "|" + str(voice) + "|" + str(speed)).encode("utf-8")).hexdigest()[:24]
+        part_path = cache_dir / (signature + ".wav")
+        if not part_path.is_file() or part_path.stat().st_size <= 44:
             try:
                 audio_bytes = _gemini_tts_chunk(part, api_key, voice, speed)
                 part_path.write_bytes(audio_bytes)
                 if part_path.stat().st_size <= 44:
                     raise RuntimeError("Gemini TTS audio အလွတ်ဖြစ်နေသည်။")
-                audio_parts.append(part_path)
             except Exception as exc:
                 last_error = exc
-                break
-        if len(audio_parts) != len(parts):
-            fail("Gemini AI Voice ဖန်တီးမရပါ။ အပိုင်း " + str(len(audio_parts) + 1) + "/" + str(len(parts)) + " တွင် ရပ်သွားသည်။ " + str(last_error)[:500])
-        concat_inputs, concat_labels = [], []
-        for index, part_path in enumerate(audio_parts):
-            concat_inputs.extend(["-i", str(part_path)])
-            concat_labels.append("[%d:a]" % index)
-        filter_graph = "".join(concat_labels) + "concat=n=%d:v=0:a=1[outa]" % len(audio_parts)
-        run_command(["ffmpeg", "-y", *concat_inputs, "-filter_complex", filter_graph,
-                     "-map", "[outa]", "-c:a", "libmp3lame", "-q:a", "3", str(audio_path)], timeout=600)
-        if not audio_path.exists() or audio_path.stat().st_size == 0:
-            fail("Gemini AI Voice အသံဖိုင်ကို ပေါင်းစည်းမရပါ။")
-        if boundaries_path:
-            Path(boundaries_path).write_text("[]", encoding="utf-8")
-    finally:
-        shutil.rmtree(temp_dir, ignore_errors=True)
+                fail("Gemini AI Voice ဖန်တီးမရပါ။ အပိုင်း " + str(index + 1) + "/" + str(len(parts)) + " တွင် ရပ်သွားသည်။ " + str(last_error)[:500])
+        audio_parts.append(part_path)
+    concat_inputs, concat_labels = [], []
+    for index, part_path in enumerate(audio_parts):
+        concat_inputs.extend(["-i", str(part_path)])
+        concat_labels.append("[%d:a]" % index)
+    filter_graph = "".join(concat_labels) + "concat=n=%d:v=0:a=1[outa]" % len(audio_parts)
+    run_command(["ffmpeg", "-y", *concat_inputs, "-filter_complex", filter_graph,
+                 "-map", "[outa]", "-c:a", "libmp3lame", "-q:a", "3", str(audio_path)], timeout=600)
+    if not audio_path.exists() or audio_path.stat().st_size == 0:
+        fail("Gemini AI Voice အသံဖိုင်ကို ပေါင်းစည်းမရပါ။")
+    if boundaries_path:
+        Path(boundaries_path).write_text("[]", encoding="utf-8")
 
 def clean_myanmar_text(text):
     """Only remove invisible formatting characters; do not guess-convert Myanmar text."""
