@@ -469,7 +469,7 @@ document.getElementById('generateTranscriptFirst').addEventListener('click',asyn
   sourceScriptBox.value=data.transcript||'';
   if(!sourceScriptBox.value.trim())throw new Error('Transcript အလွတ်ဖြစ်နေသည်။');
   status.textContent='Transcript ထုတ်ပြီးပါပြီ။ မူရင်းစာသားကို Step 2 မှာ ဖြည့်ပြီး Gemini ဘာသာပြန်ရန် အသင့်ဖြစ်ပါပြီ။';
-  document.querySelector('.panel:has(#sourceScript)')?.scrollIntoView({behavior:'smooth',block:'start'});
+  sourceScriptBox.scrollIntoView({behavior:'smooth',block:'center'});
  }catch(err){status.textContent='Transcript အမှား: '+err.message;}
  finally{button.disabled=false;}
 });
