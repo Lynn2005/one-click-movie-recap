@@ -689,7 +689,7 @@ def make_recap(transcript, language, api_key):
     # Generate sequential sections instead of asking for the whole transcript in one
     # response. This avoids silently losing the beginning/end when the model hits its
     # output-token limit. Keep sentence boundaries when splitting.
-    sentences = [s.strip() for s in re.split(r"(?<=[.!?။])\s*|\n+", transcript) if s.strip()]
+    sentences = [part.strip() for part in re.split(r"(?<=[.!?။])\s*|\n+", text) if part.strip()]
     # Also split unusually long unpunctuated Whisper output, so no API request is oversized.
     pieces = []
     for sentence in sentences or [transcript.strip()]:
@@ -861,7 +861,7 @@ def _gemini_tts_chunk(part, api_key, voice, speed):
             try:
                 wait_seconds = max(1, min(65, int(float(retry_after))))
             except (TypeError, ValueError):
-                match = re.search(r"retry in\\s+(\\d+)\\s*s", response.text, re.IGNORECASE)
+                match = re.search(r"retry in\s+(\d+)\s*s", response.text, re.IGNORECASE)
                 wait_seconds = min(65, int(match.group(1)) + 1) if match else 3
             time.sleep(wait_seconds)
             continue
@@ -873,7 +873,7 @@ def _gemini_tts_chunk(part, api_key, voice, speed):
 
 def _split_tts_chunks(text, max_chars=220):
     """Group complete sentences into moderate-size chunks without dropping text."""
-    sentences = [part.strip() for part in re.split(r"(?<=[.!?။])\\s*|\\n+", text) if part.strip()]
+    sentences = [part.strip() for part in re.split(r"(?<=[.!?။])\s*|\n+", text) if part.strip()]
     if not sentences:
         sentences = [text.strip()]
     chunks, current = [], ""
@@ -946,7 +946,7 @@ def clean_myanmar_text(text):
 
 def split_sentences(text):
     # Burmese sentences often have no whitespace after ။ or ၊.
-    pieces = re.split(r"(?<=[.!?။])\s*|\n+", text.strip())
+    sentences = [part.strip() for part in re.split(r"(?<=[.!?။])\s*|\n+", text) if part.strip()]
     pieces = [p.strip() for p in pieces if p.strip()]
     lines = []
     for piece in pieces:
